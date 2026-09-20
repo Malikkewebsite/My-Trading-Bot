@@ -1,64 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Dashboard - Malik Trading Bot</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trading Dashboard - Bybit Bot</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="bot-title">TRADING DASHBOARD</div>
-            <div class="wallet-box">WALLET: <span id="walletBalance">$100.00</span></div>
-        </header>
+  <header>
+    <div class="logo">⚡ Bot Dashboard</div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="admin.html">Admin</a>
+    </div>
+  </header>
 
-        <div class="controls-section">
-            <div class="input-group">
-                <label>Username</label>
-                <input type="text" id="usernameInput" value="Malik_Trader">
-            </div>
-            <div class="input-group">
-                <label>Coin Symbol</label>
-                <input type="text" id="coinSymbol" value="BTCUSDT">
-            </div>
-            <div class="input-group">
-                <label>Allocated Capital ($)</label>
-                <input type="number" id="allocatedCapital" value="50.00">
-            </div>
-            <div class="btn-group">
-                <button id="startBtn" class="btn-start">Start Bot</button>
-                <button id="stopBtn" class="btn-stop">Stop Bot</button>
-            </div>
-            <div class="btn-group" style="margin-top: 10px;">
-                <button id="depositBtn" class="btn-start" style="background: #2196F3;">Deposit Request</button>
-                <button id="withdrawBtn" class="btn-stop" style="background: #ff9800;">Withdraw Request</button>
-            </div>
+  <div class="container">
+    <div class="grid-2">
+      <div class="card">
+        <h3>Market Live Ticker (BTC/USDT)</h3>
+        <div id="livePrice" style="font-size: 32px; font-weight: bold; margin: 20px 0; color: var(--accent-green);">Loading...</div>
+        <p style="color: var(--text-muted);">SMC Status: <span style="color: var(--accent-green);">Active / Bullish Order Block Detected</span></p>
+      </div>
+      <div class="card">
+        <h3>Bot Risk Controls</h3>
+        <div style="margin: 15px 0;">
+          <label>Risk Per Trade (%):</label>
+          <input type="number" value="1" style="width: 100%; padding: 8px; margin-top: 5px; background: var(--bg-color); border: 1px solid var(--border-color); color: white; border-radius: 4px;">
         </div>
-
-        <div class="logs-section">
-            <h3>Live Activity Logs</h3>
-            <div id="logsContainer" class="logs-box">
-                <p>Connected to Bybit Live feed...</p>
-            </div>
+        <div style="margin: 15px 0;">
+          <label>Auto Break-Even Trigger (R:R):</label>
+          <input type="number" value="1.5" style="width: 100%; padding: 8px; margin-top: 5px; background: var(--bg-color); border: 1px solid var(--border-color); color: white; border-radius: 4px;">
         </div>
-
-        <div class="admin-link-box" style="display: flex; justify-content: space-between; margin-top: 15px;">
-            <a href="index.html" class="btn-back">← Back to Home</a>
-            <a href="admin.html" target="_blank" class="btn-admin">Admin Panel (Mobile)</a>
-        </div>
+        <button class="btn" style="width: 100%; margin-top: 10px;" onclick="toggleBot()">Toggle Bot Execution</button>
+      </div>
     </div>
 
-    <!-- STYLISH ERROR POPUP MODAL -->
-    <div id="errorPopup" class="popup-overlay" style="display: none;">
-        <div class="popup-card">
-            <div class="popup-icon">⚠️</div>
-            <h3>Bybit Exchange Error</h3>
-            <p id="popupErrorMessage">An error occurred.</p>
-            <button id="popupCloseBtn" class="popup-btn">OK, Got It</button>
-        </div>
+    <div class="card">
+      <h3>Live Open Positions</h3>
+      <table style="width: 100%; margin-top: 15px; border-collapse: collapse; text-align: left;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
+            <th style="padding: 10px;">Symbol</th>
+            <th>Side</th>
+            <th>Entry Price</th>
+            <th>Size</th>
+            <th>PNL</th>
+          </tr>
+        </thead>
+        <tbody id="positionsTable">
+          <tr>
+            <td style="padding: 10px;">BTCUSDT</td>
+            <td style="color: var(--accent-green);">LONG</td>
+            <td>$64,250.00</td>
+            <td>0.05 BTC</td>
+            <td style="color: var(--accent-green);">+$42.50</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
+  </div>
 
-    <script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
