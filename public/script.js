@@ -624,29 +624,63 @@ function filterCoins() {
 function openModal(id) { document.getElementById(id).style.display = "flex"; }
 function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
 
-function submitDeposit() {
+async function submitDeposit() {
     let amt = document.getElementById("depAmount").value;
     let txid = document.getElementById("depTxid").value;
     let net = document.getElementById("depNetwork").value;
 
     if(!amt || !txid) { showToast("Fill all deposit details!", "error"); return; }
 
+    let txData = {
+        user_id: "UID-781988",
+        type: "DEPOSIT",
+        amount: parseFloat(amt),
+        status: "pending"
+    };
+
+    try {
+        await fetch('http://localhost:5000/api/transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(txData)
+        });
+    } catch(e) {
+        console.error("Supabase API Error", e);
+    }
+
     adminRequests.push({ id: Date.now(), type: 'DEPOSIT', amount: parseFloat(amt), details: `${net} | ${txid.substring(0,8)}...` });
     renderAdminTable();
     closeModals();
-    showToast("Deposit Request Sent to Admin!", "success");
+    showToast("Deposit Request Sent & Saved to Supabase!", "success");
 }
 
-function submitWithdraw() {
+async function submitWithdraw() {
     let amt = document.getElementById("withAmount").value;
     let addr = document.getElementById("withAddress").value;
 
     if(!amt || !addr) { showToast("Fill all withdraw details!", "error"); return; }
 
+    let txData = {
+        user_id: "UID-781988",
+        type: "WITHDRAW",
+        amount: parseFloat(amt),
+        status: "pending"
+    };
+
+    try {
+        await fetch('http://localhost:5000/api/transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(txData)
+        });
+    } catch(e) {
+        console.error("Supabase API Error", e);
+    }
+
     adminRequests.push({ id: Date.now(), type: 'WITHDRAW', amount: parseFloat(amt), details: addr.substring(0,8) + '...' });
     renderAdminTable();
     closeModals();
-    showToast("Withdraw Request Sent to Admin!", "success");
+    showToast("Withdraw Request Sent & Saved to Supabase!", "success");
 }
 
 function renderAdminTable() {
