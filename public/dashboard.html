@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Dashboard - Malik Trading Bot</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="bot-title">TRADING DASHBOARD</div>
+            <div class="wallet-box">WALLET: <span id="walletBalance">$100.00</span></div>
+        </header>
+
+        <div class="controls-section">
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="usernameInput" value="Malik_Trader">
+            </div>
+            <div class="input-group">
+                <label>Coin Symbol</label>
+                <input type="text" id="coinSymbol" value="BTCUSDT">
+            </div>
+            <div class="input-group">
+                <label>Allocated Capital ($)</label>
+                <input type="number" id="allocatedCapital" value="50.00">
+            </div>
+            <div class="btn-group">
+                <button id="startBtn" class="btn-start">Start Bot</button>
+                <button id="stopBtn" class="btn-stop">Stop Bot</button>
+            </div>
+            <div class="btn-group" style="margin-top: 10px;">
+                <button id="depositBtn" class="btn-start" style="background: #2196F3;">Deposit Request</button>
+                <button id="withdrawBtn" class="btn-stop" style="background: #ff9800;">Withdraw Request</button>
+            </div>
+        </div>
+
+        <div class="logs-section">
+            <h3>Live Activity Logs</h3>
+            <div id="logsContainer" class="logs-box">
+                <p>Connected to Bybit Live feed...</p>
+            </div>
+        </div>
+
+        <div class="admin-link-box" style="display: flex; justify-content: space-between; margin-top: 15px;">
+            <a href="index.html" class="btn-back">← Back to Home</a>
+            <a href="admin.html" target="_blank" class="btn-admin">Admin Panel (Mobile)</a>
+        </div>
+    </div>
+
+    <!-- STYLISH ERROR POPUP MODAL -->
+    <div id="errorPopup" class="popup-overlay" style="display: none;">
+        <div class="popup-card">
+            <div class="popup-icon">⚠️</div>
+            <h3>Bybit Exchange Error</h3>
+            <p id="popupErrorMessage">An error occurred.</p>
+            <button id="popupCloseBtn" class="popup-btn">OK, Got It</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
