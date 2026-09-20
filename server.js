@@ -75,7 +75,7 @@ app.post('/api/bot/start', (req, res) => {
     });
 });
 
-// Fallback to index.html for single-page application routing
+// Fallback route for SPA
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
