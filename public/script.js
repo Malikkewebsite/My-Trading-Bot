@@ -1,4 +1,5 @@
 const adminWhatsAppNumber = "923000000000"; 
+const API_BASE = "http://localhost:5000"; // Agar live server par ho toh apna domain/backend URL lagayein
 
 let okxSpotCoins = [
     "MOODENG-USDT", "XRP-USDT", "SOL-USDT", "BTC-USDT", "ETH-USDT", "DOGE-USDT", 
@@ -25,57 +26,31 @@ let isPageOneAdminOnly = false;
 let isAdminLoggedIn = false;
 
 let activeAccessCodeObj = null;
+let databaseCodes = [];
 
-let generatedCodes = {
-    tier20Sec: [],
-    tier7: [],
-    tier14: [],
-    tier30: []
-};
-
-function generateRandomCode(prefix, len = 3) {
-    let chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-    let res = prefix + "-";
-    for(let i=0; i<len; i++) {
-        res += chars.charAt(Math.floor(Math.random() * chars.length));
+async function fetchCodesFromServer() {
+    try {
+        let res = await fetch(`${API_BASE}/api/codes`);
+        let json = await res.json();
+        if(json.status === 'success') {
+            databaseCodes = json.data;
+            renderAdminCodesListFromDB();
+        }
+    } catch(e) {
+        console.error("Error fetching codes", e);
     }
-    return res;
 }
 
-function initAdminCodes() {
-    let savedCodes = localStorage.getItem("bot_generated_codes");
-    if(savedCodes) {
-        generatedCodes = JSON.parse(savedCodes);
-        if(!generatedCodes.tier20Sec) generatedCodes.tier20Sec = [];
-    } 
-    
-    if(!generatedCodes.tier20Sec || generatedCodes.tier20Sec.length === 0) {
-        generatedCodes.tier20Sec = [{ code: generateRandomCode("T20", 3), seconds: 20, plan: "20 Seconds Test" }];
-    }
-    if(!generatedCodes.tier7 || generatedCodes.tier7.length === 0) {
-        generatedCodes.tier7 = [];
-        for(let i=0; i<5; i++) generatedCodes.tier7.push({ code: generateRandomCode("7D", 4), days: 7, plan: "7 Days Access" });
-    }
-    if(!generatedCodes.tier14 || generatedCodes.tier14.length === 0) {
-        generatedCodes.tier14 = [];
-        for(let i=0; i<5; i++) generatedCodes.tier14.push({ code: generateRandomCode("14D", 4), days: 14, plan: "14 Days Access" });
-    }
-    if(!generatedCodes.tier30 || generatedCodes.tier30.length === 0) {
-        generatedCodes.tier30 = [];
-        for(let i=0; i<5; i++) generatedCodes.tier30.push({ code: generateRandomCode("30D", 4), days: 30, plan: "30 Days VIP" });
-    }
-    saveCodesToStorage();
-}
+function renderAdminCodesListFromDB() {
+    let list20 = databaseCodes.filter(c => c.plan.includes('20') && !c.is_used);
+    let list7 = databaseCodes.filter(c => c.plan.includes('7') && !c.is_used);
+    let list14 = databaseCodes.filter(c => c.plan.includes('14') && !c.is_used);
+    let list30 = databaseCodes.filter(c => c.plan.includes('30') && !c.is_used);
 
-function saveCodesToStorage() {
-    localStorage.setItem("bot_generated_codes", JSON.stringify(generatedCodes));
-}
-
-function renderAdminCodesList() {
-    renderCodeCategory("codesList20Sec", generatedCodes.tier20Sec);
-    renderCodeCategory("codesList7Days", generatedCodes.tier7);
-    renderCodeCategory("codesList14Days", generatedCodes.tier14);
-    renderCodeCategory("codesList30Days", generatedCodes.tier30);
+    renderCodeCategory("codesList20Sec", list20);
+    renderCodeCategory("codesList7Days", list7);
+    renderCodeCategory("codesList14Days", list14);
+    renderCodeCategory("codesList30Days", list30);
 }
 
 function renderCodeCategory(elementId, codeArray) {
@@ -107,52 +82,45 @@ function openPageOneAdminModal() {
 function openFullAdminModal() {
     isPageOneAdminOnly = false;
     document.getElementById("adminNavTabs").style.display = "flex";
+    fetchAdminTransactions();
     openModal('adminModal');
 }
 
-function verifyAndUnlockCode() {
+async function verifyAndUnlockCode() {
     let userCode = document.getElementById("userPasscode").value.trim().toUpperCase();
     if(!userCode) {
         showToast("Please enter an access passcode!", "error");
         return;
     }
 
-    let foundMatch = null;
+    try {
+        let res = await fetch(`${API_BASE}/api/codes/use`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: userCode })
+        });
+        let json = await res.json();
 
-    ['tier20Sec', 'tier7', 'tier14', 'tier30'].forEach(key => {
-        let idx = generatedCodes[key].findIndex(c => c.code === userCode);
-        if(idx !== -1) {
-            foundMatch = generatedCodes[key][idx];
-            generatedCodes[key].splice(idx, 1);
-            
-            if(key === 'tier20Sec') {
-                generatedCodes[key].push({ code: generateRandomCode("T20", 3), seconds: 20, plan: "20 Seconds Test" });
-            } else {
-                let newDays = key === 'tier7' ? 7 : (key === 'tier14' ? 14 : 30);
-                let newPrefix = key === 'tier7' ? '7D' : (key === 'tier14' ? '14D' : '30D');
-                let newPlanName = key === 'tier7' ? '7 Days Access' : (key === 'tier14' ? '14 Days Access' : '30 Days VIP');
-                generatedCodes[key].push({ code: generateRandomCode(newPrefix, 4), days: newDays, plan: newPlanName });
-            }
-            saveCodesToStorage();
-            renderAdminCodesList();
+        if(json.status === 'success') {
+            let foundMatch = json.matchedCode;
+            let expiryTimestamp = foundMatch.seconds ? Date.now() + (foundMatch.seconds * 1000) : Date.now() + (foundMatch.days * 24 * 60 * 60 * 1000);
+            activeAccessCodeObj = {
+                plan: foundMatch.plan,
+                days: foundMatch.days || 0,
+                seconds: foundMatch.seconds || 0,
+                expiry: expiryTimestamp
+            };
+            localStorage.setItem("bot_active_access", JSON.stringify(activeAccessCodeObj));
+            document.getElementById("userPasscode").value = "";
+            showToast(`Passcode Accepted! ${foundMatch.plan} Unlocked.`, "success");
+            fetchCodesFromServer();
+            switchToDashboard();
+        } else {
+            document.getElementById("userPasscode").value = "";
+            showToast(json.message || "Invalid or Already Used Access Passcode!", "error");
         }
-    });
-
-    if(foundMatch) {
-        let expiryTimestamp = foundMatch.seconds ? Date.now() + (foundMatch.seconds * 1000) : Date.now() + (foundMatch.days * 24 * 60 * 60 * 1000);
-        activeAccessCodeObj = {
-            plan: foundMatch.plan,
-            days: foundMatch.days || 0,
-            seconds: foundMatch.seconds || 0,
-            expiry: expiryTimestamp
-        };
-        localStorage.setItem("bot_active_access", JSON.stringify(activeAccessCodeObj));
-        document.getElementById("userPasscode").value = "";
-        showToast(`Passcode Accepted! ${foundMatch.plan} Unlocked.`, "success");
-        switchToDashboard();
-    } else {
-        document.getElementById("userPasscode").value = "";
-        showToast("Invalid or Already Used Access Passcode!", "error");
+    } catch(e) {
+        showToast("Server connection error during code verification!", "error");
     }
 }
 
@@ -214,10 +182,10 @@ function openPurchaseModal(planName, price) {
 }
 
 window.onload = function() {
-    initAdminCodes();
-    renderAdminCodesList();
+    fetchCodesFromServer();
     loadPersistentState();
     checkActiveAccessValidity();
+    fetchAdminTransactions();
 
     document.getElementById("coinSearchInput").value = selectedCoin;
     populateCoinList(okxSpotCoins);
@@ -225,6 +193,7 @@ window.onload = function() {
     fetchOKXRealPrice();
     setInterval(fetchOKXRealPrice, 1000);
     setInterval(updateAccessTimerUI, 1000);
+    setInterval(fetchAdminTransactions, 5000); // Live poll admin requests from Supabase every 5s
 };
 
 function savePersistentState() {
@@ -298,7 +267,8 @@ function authenticateAdmin() {
             document.getElementById("adminNavTabs").style.display = "flex";
         }
 
-        renderAdminCodesList();
+        fetchCodesFromServer();
+        fetchAdminTransactions();
         showToast("Admin Authenticated Successfully!", "success");
         savePersistentState();
     } else {
@@ -635,23 +605,24 @@ async function submitDeposit() {
         user_id: "UID-781988",
         type: "DEPOSIT",
         amount: parseFloat(amt),
-        status: "pending"
+        status: "pending",
+        details: `${net} | ${txid}`
     };
 
     try {
-        await fetch('http://localhost:5000/api/transactions', {
+        let res = await fetch(`${API_BASE}/api/transactions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(txData)
         });
+        if(res.ok) {
+            closeModals();
+            showToast("Deposit Request Sent & Saved to Supabase!", "success");
+            fetchAdminTransactions();
+        }
     } catch(e) {
-        console.error("Supabase API Error", e);
+        showToast("Error submitting deposit request", "error");
     }
-
-    adminRequests.push({ id: Date.now(), type: 'DEPOSIT', amount: parseFloat(amt), details: `${net} | ${txid.substring(0,8)}...` });
-    renderAdminTable();
-    closeModals();
-    showToast("Deposit Request Sent & Saved to Supabase!", "success");
 }
 
 async function submitWithdraw() {
@@ -664,27 +635,41 @@ async function submitWithdraw() {
         user_id: "UID-781988",
         type: "WITHDRAW",
         amount: parseFloat(amt),
-        status: "pending"
+        status: "pending",
+        details: addr
     };
 
     try {
-        await fetch('http://localhost:5000/api/transactions', {
+        let res = await fetch(`${API_BASE}/api/transactions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(txData)
         });
+        if(res.ok) {
+            closeModals();
+            showToast("Withdraw Request Sent & Saved to Supabase!", "success");
+            fetchAdminTransactions();
+        }
     } catch(e) {
-        console.error("Supabase API Error", e);
+        showToast("Error submitting withdraw request", "error");
     }
+}
 
-    adminRequests.push({ id: Date.now(), type: 'WITHDRAW', amount: parseFloat(amt), details: addr.substring(0,8) + '...' });
-    renderAdminTable();
-    closeModals();
-    showToast("Withdraw Request Sent & Saved to Supabase!", "success");
+async function fetchAdminTransactions() {
+    try {
+        let res = await fetch(`${API_BASE}/api/transactions`);
+        let json = await res.json();
+        if(json.status === 'success') {
+            adminRequests = json.data.filter(t => t.status === 'pending');
+            renderAdminTable();
+        }
+    } catch(e) {}
 }
 
 function renderAdminTable() {
     let tbody = document.getElementById("adminRequestsTable");
+    if(!tbody) return;
+
     if(adminRequests.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No pending requests</td></tr>`;
         return;
@@ -695,35 +680,41 @@ function renderAdminTable() {
         let row = `<tr>
             <td style="color:${req.type === 'DEPOSIT' ? '#0ecb81' : '#f0b90b'}"><b>${req.type}</b></td>
             <td>$${req.amount}</td>
-            <td><small>${req.details}</small></td>
+            <td><small>${req.details ? req.details.substring(0, 20) + '...' : ''}</small></td>
             <td>
-                <button class="btn-claim" onclick="approveReq(${req.id})">Approve</button>
-                <button class="btn-close-pos" onclick="rejectReq(${req.id})">Reject</button>
+                <button class="btn-claim" onclick="updateTxStatus('${req.id}', 'approved', ${req.amount}, '${req.type}')">Approve</button>
+                <button class="btn-close-pos" onclick="updateTxStatus('${req.id}', 'rejected', 0, '${req.type}')">Reject</button>
             </td>
         </tr>`;
         tbody.innerHTML += row;
     });
 }
 
-function approveReq(id) {
-    let req = adminRequests.find(r => r.id === id);
-    if(req) {
-        if(req.type === 'DEPOSIT') totalWalletBalance += req.amount;
-        else totalWalletBalance -= req.amount;
+async function updateTxStatus(id, newStatus, amount, type) {
+    try {
+        let res = await fetch(`${API_BASE}/api/transactions/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
 
-        document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-        document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
-        showToast(`${req.type} Request Approved!`, "success");
-        savePersistentState();
+        if(res.ok) {
+            if(newStatus === 'approved') {
+                if(type === 'DEPOSIT') totalWalletBalance += amount;
+                else totalWalletBalance -= amount;
+
+                document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
+                savePersistentState();
+                showToast("Request Approved & Wallet Updated!", "success");
+            } else {
+                showToast("Request Rejected", "error");
+            }
+            fetchAdminTransactions();
+        }
+    } catch(e) {
+        showToast("Error updating request status", "error");
     }
-    adminRequests = adminRequests.filter(r => r.id !== id);
-    renderAdminTable();
-}
-
-function rejectReq(id) {
-    adminRequests = adminRequests.filter(r => r.id !== id);
-    renderAdminTable();
-    showToast("Request Rejected", "error");
 }
 
 function claimSessionProfit() {
@@ -758,6 +749,7 @@ function renderSingleLog(log) {
 
 function showToast(msg, type = 'info') {
     let container = document.getElementById("toastContainer");
+    if(!container) return;
     let toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.innerText = msg;
@@ -767,6 +759,7 @@ function showToast(msg, type = 'info') {
 
 function logConsole(msg) {
     let terminal = document.getElementById("sysTerminal");
+    if(!terminal) return;
     terminal.innerHTML += `${msg}<br>`;
     terminal.scrollTop = terminal.scrollHeight;
     savePersistentState();
