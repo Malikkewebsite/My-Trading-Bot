@@ -1,16 +1,16 @@
 {
-  "name": "bybit-trading-bot",
+  "name": "my-trading-bot",
   "version": "1.0.0",
-  "description": "Real-time automated spot trading platform with Bybit and Supabase",
+  "description": "Advanced Crypto Trading Bot with SMC, FVG & Bybit Integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "body-parser": "^1.20.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "pg": "^8.11.3"
+    "pg": "^8.11.3",
+    "dotenv": "^16.4.5",
+    "axios": "^1.6.8",
+    "cors": "^2.8.5"
   }
 }
