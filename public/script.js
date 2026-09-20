@@ -1,4 +1,4 @@
-const adminWhatsAppNumber = "923000000000"; 
+const adminWhatsAppNumber = "923125124424"; 
 const API_BASE = ""; // Vercel par same domain use karne ke liye isay khaali chhor dein
 
 let okxSpotCoins = [
