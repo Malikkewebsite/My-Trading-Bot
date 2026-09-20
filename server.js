@@ -8,6 +8,9 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// 1. SERVE STATIC FILES FIRST (This fixes the CSS/JS loading issue permanently)
+app.use(express.static(path.join(__dirname, 'public')));
+
 // In-memory fallback database
 let dbCodes = [
     { id: '1', code: 'BYBIT-VIP-9921', tier: 'VIP Unlimited', used: false },
@@ -21,7 +24,7 @@ let dbTransactions = [
 const BYBIT_API_KEY = process.env.BYBIT_API_KEY || 'eZKaZBv02FE2NX5Jd';
 const BYBIT_API_SECRET = process.env.BYBIT_API_SECRET || 'TGvJJ6E833VwImpP8Ed5l6Y4E1owjlpvw';
 
-// API Routes
+// 2. API ROUTES
 app.get('/api/codes', (req, res) => res.json(dbCodes));
 
 app.post('/api/codes', (req, res) => {
@@ -71,6 +74,11 @@ app.post('/api/bot/start', (req, res) => {
         message: `Successfully authenticated with Bybit V5 REST API. Bot active for ${symbol}.`,
         timestamp
     });
+});
+
+// 3. FALLBACK CATCH-ALL ROUTE (Must be absolute last to serve index.html properly)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
