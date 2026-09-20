@@ -3,79 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Control Panel - Bybit Trading Bot</title>
+    <title>Admin Panel - Mobile View</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="admin-body">
     <div class="container">
         <h1>Admin Control Panel</h1>
-        <p>Manage users, live balances, and active trades in real-time.</p>
+        <p>Monitor live user balances, active trades, and deposit/withdrawal requests from your mobile device.</p>
         
         <div class="admin-section">
-            <h2>Registered Users & Balances</h2>
+            <h2>User Balances</h2>
             <table id="usersTable">
                 <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Username</th>
-                        <th>Balance ($)</th>
-                        <th>Joined At</th>
-                    </tr>
+                    <tr><th>User</th><th>Balance</th></tr>
                 </thead>
-                <tbody>
-                    <!-- Dynamic data will load here -->
-                </tbody>
+                <tbody></tbody>
             </table>
         </div>
 
         <div class="admin-section">
-            <h2>Active & Past Trades History</h2>
+            <h2>Deposit / Withdrawal Requests</h2>
+            <table id="txTable">
+                <thead>
+                    <tr><th>User</th><th>Type</th><th>Amount</th><th>Status</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="admin-section">
+            <h2>Active Trades</h2>
             <table id="tradesTable">
                 <thead>
-                    <tr>
-                        <th>Trade ID</th>
-                        <th>Username</th>
-                        <th>Symbol</th>
-                        <th>Amount ($)</th>
-                        <th>Status</th>
-                        <th>PnL ($)</th>
-                    </tr>
+                    <tr><th>User</th><th>Symbol</th><th>Amount</th><th>Status</th></tr>
                 </thead>
-                <tbody>
-                    <!-- Dynamic data will load here -->
-                </tbody>
+                <tbody></tbody>
             </table>
         </div>
         
-        <br>
-        <a href="index.html" class="btn-back">Back to Trading Bot</a>
+        <a href="index.html" class="btn-back">← Back to Home</a>
     </div>
 
     <script>
         async function fetchAdminData() {
             try {
-                const response = await fetch('/api/admin/data');
-                const data = await response.json();
+                const res = await fetch('/api/admin/data');
+                const data = await res.json();
                 if(data.success) {
-                    // Populate Users
-                    const userTableBody = document.querySelector('#usersTable tbody');
-                    userTableBody.innerHTML = '';
-                    data.users.forEach(user => {
-                        userTableBody.innerHTML += `<tr><td>${user.id}</td><td>${user.username}</td><td>$${user.balance}</td><td>${user.created_at}</td></tr>`;
-                    });
+                    let uHtml = '';
+                    data.users.forEach(u => uHtml += `<tr><td>${u.username}</td><td>$${u.balance}</td></tr>`);
+                    document.querySelector('#usersTable tbody').innerHTML = uHtml;
 
-                    // Populate Trades
-                    const tradeTableBody = document.querySelector('#tradesTable tbody');
-                    tradeTableBody.innerHTML = '';
-                    data.trades.forEach(trade => {
-                        tradeTableBody.innerHTML += `<tr><td>${trade.id}</td><td>${trade.username}</td><td>${trade.symbol}</td><td>$${trade.amount}</td><td>${trade.status}</td><td>$${trade.pnl}</td></tr>`;
-                    });
+                    let tHtml = '';
+                    data.transactions.forEach(tx => tHtml += `<tr><td>${tx.username}</td><td><b>${tx.type}</b></td><td>$${tx.amount}</td><td>${tx.status}</td></tr>`);
+                    document.querySelector('#txTable tbody').innerHTML = tHtml;
+
+                    let trHtml = '';
+                    data.trades.forEach(tr => trHtml += `<tr><td>${tr.username}</td><td>${tr.symbol}</td><td>$${tr.amount}</td><td>${tr.status}</td></tr>`);
+                    document.querySelector('#tradesTable tbody').innerHTML = trHtml;
                 }
             } catch (err) {
-                console.error('Error fetching admin data:', err);
+                console.error(err);
             }
         }
-        setInterval(fetchAdminData, 3000); // Real-time sync every 3 seconds
+        setInterval(fetchAdminData, 3000);
         fetchAdminData();
     </script>
 </body>
