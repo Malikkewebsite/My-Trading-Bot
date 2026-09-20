@@ -7,8 +7,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-// Serve static frontend files from the 'public' folder
-app.use(express.static(path.join(__dirname, 'public')));
 
 // In-memory fallback database
 let dbCodes = [
@@ -73,11 +71,6 @@ app.post('/api/bot/start', (req, res) => {
         message: `Successfully authenticated with Bybit V5 REST API. Bot active for ${symbol}.`,
         timestamp
     });
-});
-
-// Fallback route for SPA
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
