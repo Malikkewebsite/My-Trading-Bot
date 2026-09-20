@@ -9,13 +9,11 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
-// PostgreSQL Database Connection using Supabase URI
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL || "postgresql://postgres:Malik2026@db.sbrtwcchusogvsopnjes.supabase.co:5432/postgres",
     ssl: { rejectUnauthorized: false }
 });
 
-// Test Database Connection & Create Tables if not exist
 pool.connect(async (err, client, release) => {
     if (err) {
         console.error('Database connection error:', err.stack);
@@ -23,7 +21,6 @@ pool.connect(async (err, client, release) => {
         console.log('Connected to Supabase PostgreSQL Database successfully!');
         release();
         
-        // Initialize Tables for Users and Trades
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -41,26 +38,28 @@ pool.connect(async (err, client, release) => {
                 pnl NUMERIC(18, 2) DEFAULT 0.00,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS transactions (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) NOT NULL,
+                type VARCHAR(20) NOT NULL,
+                amount NUMERIC(18, 2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'PENDING',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         `);
     }
 });
 
-// Bybit API Credentials
-const BYBIT_API_KEY = "eZKaZBvZ02FE2NX5Jd";
-const BYBIT_SECRET = "TGvIJJ6E833VwPlmP8EEd5l6Y4E1owjlpvuw";
-
-// API: Start Trade & Validate Server-Side Balance
 app.post('/api/start-trade', async (req, res) => {
     const { username, symbol, allocatedCapital } = req.body;
-
     try {
-        let userResult = await pool.query('SELECT * FROM users WHERE username = $1', [username || 'default_user']);
-        
+        let userResult = await pool.query('SELECT * FROM users WHERE username = $1', [username || 'Malik_Trader']);
         let user;
         if (userResult.rows.length === 0) {
             const newUser = await pool.query(
                 'INSERT INTO users (username, balance) VALUES ($1, $2) RETURNING *',
-                [username || 'default_user', 100.00]
+                [username || 'Malik_Trader', 100.00]
             );
             user = newUser.rows[0];
         } else {
@@ -70,49 +69,54 @@ app.post('/api/start-trade', async (req, res) => {
         const currentBalance = parseFloat(user.balance);
         const requestedAmount = parseFloat(allocatedCapital);
 
-        // Strict Server-Side Balance Validation
         if (requestedAmount > currentBalance) {
             return res.status(400).json({ 
                 success: false, 
-                error: `Insufficient balance! Your wallet balance is $${currentBalance}, but requested capital is $${requestedAmount}.` 
+                error: `Bybit Exchange Error [10002]: Insufficient wallet balance ($${currentBalance}). Requested capital ($${requestedAmount}) exceeds available funds.` 
             });
         }
 
-        // Record Trade in Database
         const tradeResult = await pool.query(
             'INSERT INTO trades (username, symbol, amount, status) VALUES ($1, $2, $3, $4) RETURNING *',
-            [username || 'default_user', symbol, requestedAmount, 'ACTIVE']
+            [username || 'Malik_Trader', symbol, requestedAmount, 'ACTIVE']
         );
 
         res.json({
             success: true,
-            message: "Trade successfully executed via Bybit API credentials!",
+            message: "Order successfully placed on Bybit Spot API!",
             balance: currentBalance,
             trade: tradeResult.rows[0]
         });
-
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, error: 'Internal server error during trade execution.' });
+        res.status(500).json({ success: false, error: 'Bybit Gateway Error [500]: Connection timeout or API rejection.' });
     }
 });
 
-// API: Admin Panel - Get All Users & Trades
+app.post('/api/transaction', async (req, res) => {
+    const { username, type, amount } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO transactions (username, type, amount, status) VALUES ($1, $2, $3, $4)',
+            [username || 'Malik_Trader', type, amount, 'PENDING']
+        );
+        res.json({ success: true, message: `${type} request of $${amount} sent to Admin successfully!` });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to submit transaction request.' });
+    }
+});
+
 app.get('/api/admin/data', async (req, res) => {
     try {
         const users = await pool.query('SELECT * FROM users');
         const trades = await pool.query('SELECT * FROM trades ORDER BY created_at DESC');
-        res.json({
-            success: true,
-            users: users.rows,
-            trades: trades.rows
-        });
+        const transactions = await pool.query('SELECT * FROM transactions ORDER BY created_at DESC');
+        res.json({ success: true, users: users.rows, trades: trades.rows, transactions: transactions.rows });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Failed to fetch admin dashboard data.' });
+        res.status(500).json({ success: false, error: 'Failed to fetch admin data.' });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Trading bot server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
