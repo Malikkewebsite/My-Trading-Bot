@@ -1,73 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Mobile View</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Passcodes & Users</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body class="admin-body">
-    <div class="container">
-        <h1>Admin Control Panel</h1>
-        <p>Monitor live user balances, active trades, and deposit/withdrawal requests from your mobile device.</p>
-        
-        <div class="admin-section">
-            <h2>User Balances</h2>
-            <table id="usersTable">
-                <thead>
-                    <tr><th>User</th><th>Balance</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+<body>
+  <header>
+    <div class="logo">⚡ Admin Control Panel</div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="admin.html">Admin</a>
+    </div>
+  </header>
 
-        <div class="admin-section">
-            <h2>Deposit / Withdrawal Requests</h2>
-            <table id="txTable">
-                <thead>
-                    <tr><th>User</th><th>Type</th><th>Amount</th><th>Status</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-
-        <div class="admin-section">
-            <h2>Active Trades</h2>
-            <table id="tradesTable">
-                <thead>
-                    <tr><th>User</th><th>Symbol</th><th>Amount</th><th>Status</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        
-        <a href="index.html" class="btn-back">← Back to Home</a>
+  <div class="container">
+    <div class="card">
+      <h2>Passcode Generator</h2>
+      <p style="color: var(--text-muted); margin: 10px 0 20px 0;">Generate secure login access keys for clients.</p>
+      <button class="btn" onclick="generatePasscode()">Generate New Passcode</button>
+      <div id="generatedKey" style="margin-top: 20px; font-size: 18px; color: var(--accent-green); font-weight: bold;"></div>
     </div>
 
-    <script>
-        async function fetchAdminData() {
-            try {
-                const res = await fetch('/api/admin/data');
-                const data = await res.json();
-                if(data.success) {
-                    let uHtml = '';
-                    data.users.forEach(u => uHtml += `<tr><td>${u.username}</td><td>$${u.balance}</td></tr>`);
-                    document.querySelector('#usersTable tbody').innerHTML = uHtml;
+    <div class="card">
+      <h2>System Status</h2>
+      <p>Supabase Database: <span style="color: var(--accent-green);">Connected</span></p>
+      <p style="margin-top: 10px;">Bybit API Gateway: <span style="color: var(--accent-green);">Active</span></p>
+    </div>
+  </div>
 
-                    let tHtml = '';
-                    data.transactions.forEach(tx => tHtml += `<tr><td>${tx.username}</td><td><b>${tx.type}</b></td><td>$${tx.amount}</td><td>${tx.status}</td></tr>`);
-                    document.querySelector('#txTable tbody').innerHTML = tHtml;
-
-                    let trHtml = '';
-                    data.trades.forEach(tr => trHtml += `<tr><td>${tr.username}</td><td>${tr.symbol}</td><td>$${tr.amount}</td><td>${tr.status}</td></tr>`);
-                    document.querySelector('#tradesTable tbody').innerHTML = trHtml;
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-        setInterval(fetchAdminData, 3000);
-        fetchAdminData();
-    </script>
+  <script src="script.js"></script>
 </body>
 </html>
