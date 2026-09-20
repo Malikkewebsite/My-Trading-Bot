@@ -42,10 +42,10 @@ async function fetchCodesFromServer() {
 }
 
 function renderAdminCodesListFromDB() {
-    let list20 = databaseCodes.filter(c => c.plan.includes('20') && !c.is_used);
-    let list7 = databaseCodes.filter(c => c.plan.includes('7') && !c.is_used);
-    let list14 = databaseCodes.filter(c => c.plan.includes('14') && !c.is_used);
-    let list30 = databaseCodes.filter(c => c.plan.includes('30') && !c.is_used);
+    let list20 = databaseCodes.filter(c => c.plan.toLowerCase().includes('20') && !c.is_used);
+    let list7 = databaseCodes.filter(c => c.plan.toLowerCase().includes('7') && !c.is_used);
+    let list14 = databaseCodes.filter(c => c.plan.toLowerCase().includes('14') && !c.is_used);
+    let list30 = databaseCodes.filter(c => (c.plan.toLowerCase().includes('30') || c.plan.toLowerCase().includes('vip')) && !c.is_used);
 
     renderCodeCategory("codesList20Sec", list20);
     renderCodeCategory("codesList7Days", list7);
@@ -57,9 +57,13 @@ function renderCodeCategory(elementId, codeArray) {
     let el = document.getElementById(elementId);
     if(!el) return;
     el.innerHTML = "";
+    if(codeArray.length === 0) {
+        el.innerHTML = `<small style="color:var(--text-muted); font-size:10px;">No active unused codes available</small>`;
+        return;
+    }
     codeArray.forEach((item) => {
         el.innerHTML += `
-            <div class="admin-code-badge">
+            <div class="admin-code-badge" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:4px;">
                 <span><b>${item.code}</b> (${item.plan})</span>
                 <button class="btn-claim" onclick="copyCodeToClipboard('${item.code}')"><i class="fa-solid fa-copy"></i> Copy</button>
             </div>
@@ -193,7 +197,7 @@ window.onload = function() {
     fetchOKXRealPrice();
     setInterval(fetchOKXRealPrice, 1000);
     setInterval(updateAccessTimerUI, 1000);
-    setInterval(fetchAdminTransactions, 5000); // Live poll admin requests from Supabase every 5s
+    setInterval(fetchAdminTransactions, 5000); 
 };
 
 function savePersistentState() {
@@ -619,9 +623,11 @@ async function submitDeposit() {
             closeModals();
             showToast("Deposit Request Sent & Saved to Supabase!", "success");
             fetchAdminTransactions();
+        } else {
+            showToast("Error submitting deposit request", "error");
         }
     } catch(e) {
-        showToast("Error submitting deposit request", "error");
+        showToast("Server connection error during deposit", "error");
     }
 }
 
@@ -649,9 +655,11 @@ async function submitWithdraw() {
             closeModals();
             showToast("Withdraw Request Sent & Saved to Supabase!", "success");
             fetchAdminTransactions();
+        } else {
+            showToast("Error submitting withdraw request", "error");
         }
     } catch(e) {
-        showToast("Error submitting withdraw request", "error");
+        showToast("Server connection error during withdraw", "error");
     }
 }
 
