@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MALIK TRADING BOT (BYBIT LIVE)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="bot-title">MY TRADING BOT (BYBIT LIVE)</div>
+            <div class="wallet-box">TOTAL WALLET: <span id="walletBalance">$100.00</span></div>
+        </header>
+
+        <div class="controls-section">
+            <div class="input-group">
+                <label>Username / Account ID</label>
+                <input type="text" id="usernameInput" value="Malik_Trader" placeholder="Enter username">
+            </div>
+            <div class="input-group">
+                <label>Select & Search Bybit Spot Coin</label>
+                <input type="text" id="coinSymbol" value="AVAXUSDT">
+            </div>
+            <div class="input-group">
+                <label>Allocated Bot Capital ($)</label>
+                <input type="number" id="allocatedCapital" value="50.00">
+            </div>
+            <div class="btn-group">
+                <button id="startBtn" class="btn-start">Start Algo</button>
+                <button id="stopBtn" class="btn-stop">Stop Algo</button>
+            </div>
+        </div>
+
+        <div class="logs-section">
+            <h3>Trade Signals Log</h3>
+            <div id="logsContainer" class="logs-box">
+                <p>Connected to Bybit Live Data Feed (API Key Active). Waiting for setup confirmation...</p>
+            </div>
+        </div>
+
+        <div class="admin-link-box">
+            <a href="admin.html" target="_blank" class="btn-admin">Go to Admin Panel</a>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
