@@ -1,48 +1,1608 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bybit SMC Bot - Access Portal</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Trading Bot | Access Portal & Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Urdu+Typesetting&family=Noto+Nastaliq+Urdu&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-primary: #06090e;
+            --bg-card: rgba(18, 24, 38, 0.95);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-yellow: #f0b90b;
+            --accent-green: #0ecb81;
+            --accent-red: #f6465d;
+            --accent-blue: #00f2fe;
+            --accent-purple: #7928ca;
+            --text-main: #f0f4f8;
+            --text-muted: #848e9c;
+            --glow-yellow: 0 0 15px rgba(240, 185, 11, 0.4);
+            --glow-green: 0 0 15px rgba(14, 203, 129, 0.4);
+            --glow-purple: 0 0 20px rgba(121, 40, 202, 0.5);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; }
+        body { background: var(--bg-primary); color: var(--text-main); padding: 0; overflow-x: hidden; min-height: 100vh; }
+
+        #accessLandingPage {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 12px;
+            background: radial-gradient(circle at top, #111a2e 0%, #06090e 100%);
+            position: relative;
+        }
+
+        .hero-title {
+            font-size: 28px;
+            font-weight: 800;
+            text-align: center;
+            background: linear-gradient(135deg, #fff 0%, var(--accent-yellow) 50%, var(--accent-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 25px rgba(240, 185, 11, 0.3);
+            margin-bottom: 6px;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        .hero-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 24px;
+            max-width: 450px;
+        }
+
+        .code-unlock-box {
+            background: var(--bg-card);
+            border: 1px solid rgba(240, 185, 11, 0.3);
+            box-shadow: var(--glow-yellow);
+            border-radius: 14px;
+            padding: 16px;
+            width: 100%;
+            max-width: 420px;
+            margin-bottom: 30px;
+            text-align: center;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .code-unlock-box h3 {
+            font-size: 14px;
+            color: var(--accent-yellow);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .code-input-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .code-input-group input {
+            flex: 1;
+            padding: 12px;
+            background: #0b0f19;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-align: center;
+            outline: none;
+        }
+
+        .code-input-group input:focus {
+            border-color: var(--accent-yellow);
+            box-shadow: 0 0 10px rgba(240, 185, 11, 0.2);
+        }
+
+        .btn-unlock {
+            background: linear-gradient(135deg, var(--accent-yellow), #e0a800);
+            color: #000;
+            font-weight: 800;
+            padding: 0 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-unlock:hover {
+            transform: scale(1.03);
+            box-shadow: var(--glow-yellow);
+        }
+
+        .pricing-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            width: 100%;
+            max-width: 950px;
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .pricing-card.tier-1 { border-color: rgba(14, 203, 129, 0.4); }
+        .pricing-card.tier-1:hover { box-shadow: var(--glow-green); }
+
+        .pricing-card.tier-2 { border-color: rgba(240, 185, 11, 0.5); }
+        .pricing-card.tier-2:hover { box-shadow: var(--glow-yellow); }
+
+        .pricing-card.tier-3 { 
+            border-color: rgba(121, 40, 202, 0.6); 
+            background: linear-gradient(180deg, rgba(22, 28, 45, 0.95) 0%, rgba(35, 18, 55, 0.95) 100%);
+        }
+        .pricing-card.tier-3:hover { box-shadow: var(--glow-purple); }
+
+        .badge-popular {
+            position: absolute;
+            top: -10px;
+            right: 16px;
+            background: linear-gradient(135deg, var(--accent-purple), #f107a3);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px rgba(241, 7, 163, 0.5);
+        }
+
+        .plan-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .plan-price {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .plan-price span { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+
+        .feature-list {
+            list-style: none;
+            margin-bottom: 18px;
+            font-size: 12px;
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .feature-list li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-list i { font-size: 11px; }
+        .tier-1 .feature-list i { color: var(--accent-green); }
+        .tier-2 .feature-list i { color: var(--accent-yellow); }
+        .tier-3 .feature-list i { color: var(--accent-blue); }
+
+        .btn-buy {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .tier-1 .btn-buy { background: rgba(14, 203, 129, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .tier-1 .btn-buy:hover { background: var(--accent-green); color: #000; }
+
+        .tier-2 .btn-buy { background: rgba(240, 185, 11, 0.15); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+        .tier-2 .btn-buy:hover { background: var(--accent-yellow); color: #000; }
+
+        .tier-3 .btn-buy { background: linear-gradient(135deg, var(--accent-purple), #f107a3); color: #fff; }
+        .tier-3 .btn-buy:hover { opacity: 0.9; box-shadow: 0 0 15px rgba(241, 7, 163, 0.5); }
+
+        .secret-admin-btn {
+            position: fixed;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(18, 24, 38, 0.8);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 10px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .secret-admin-btn:hover {
+            color: var(--accent-yellow);
+            border-color: var(--accent-yellow);
+            box-shadow: var(--glow-yellow);
+        }
+
+        .wa-contact-box {
+            background: #0c1410;
+            border: 1px solid #25D366;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .wa-notice-en {
+            font-size: 12px;
+            color: #25D366;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .wa-notice-ur {
+            font-size: 13px;
+            color: #fff;
+            font-family: 'Urdu Typesetting', 'Noto Nastaliq Urdu', sans-serif;
+            margin-bottom: 14px;
+            line-height: 1.6;
+            direction: rtl;
+        }
+
+        .btn-whatsapp-direct {
+            background: #25D366;
+            color: #000;
+            font-weight: 800;
+            padding: 10px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            box-shadow: 0 0 15px rgba(37, 211, 102, 0.4);
+            transition: transform 0.2s;
+        }
+
+        .btn-whatsapp-direct:hover { transform: scale(1.03); }
+
+        .active-plan-banner {
+            background: linear-gradient(90deg, rgba(14, 203, 129, 0.2), rgba(0, 242, 254, 0.2));
+            border: 1px solid var(--accent-green);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent-green);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        #mainBotDashboard { display: none; }
+
+        .container { width: 100%; max-width: 100%; margin: 0 auto; }
+
+        header {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .header-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .logo { font-weight: 700; font-size: 13px; color: var(--accent-yellow); display: flex; align-items: center; gap: 6px; }
+        .uid-tag { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+        .header-balance-badge {
+            background: rgba(240, 185, 11, 0.12);
+            border: 1px solid var(--accent-yellow);
+            border-radius: 8px;
+            padding: 4px 10px;
+            text-align: right;
+        }
+        .header-balance-title { font-size: 8px; color: var(--accent-yellow); text-transform: uppercase; font-weight: 700; }
+        .header-balance-val { font-size: 13px; font-weight: 700; color: #fff; }
+
+        .header-bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto auto;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .hdr-btn {
+            padding: 7px 8px; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+        }
+        .hdr-dep { background: var(--accent-green); color: #000; }
+        .hdr-with { background: var(--accent-yellow); color: #000; }
+
+        .status-badge {
+            font-size: 9px; padding: 6px 8px; border-radius: 6px; font-weight: 700;
+            background: rgba(132, 142, 156, 0.15); color: var(--text-muted); border: 1px solid var(--border-color);
+        }
+        .status-badge.active { background: rgba(14, 203, 129, 0.15); color: var(--accent-green); border-color: rgba(14, 203, 129, 0.3); }
+
+        .admin-toggle-btn {
+            background: rgba(240, 185, 11, 0.15); border: 1px solid var(--accent-yellow);
+            color: var(--accent-yellow); font-size: 10px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 700;
+        }
+
+        .grid { display: flex; flex-direction: column; gap: 10px; }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; }
+        .card h2 { font-size: 13px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; justify-content: flex-start; }
+
+        .chart-wrapper {
+            background: #0d111a;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        #chartContainer { width: 100%; height: 320px; }
+
+        .chart-signal-bar {
+            background: #141824;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .form-group { margin-bottom: 10px; position: relative; }
+        label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+        input, select { width: 100%; padding: 10px; background: #141824; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); font-size: 12px; outline: none; }
+
+        .search-select-box { position: relative; }
+        .coin-dropdown {
+            position: absolute; width: 100%; max-height: 160px; overflow-y: auto;
+            background: #141824; border: 1px solid var(--border-color); border-radius: 6px;
+            z-index: 99; display: none; margin-top: 2px;
+        }
+        .coin-dropdown div { padding: 8px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .coin-dropdown div:hover { background: rgba(240, 185, 11, 0.2); }
+
+        .toggle-box { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 8px; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .btn { padding: 10px; border: none; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; }
+        .btn-start { background: var(--accent-green); color: #000; }
+        .btn-stop { background: var(--accent-red); color: #fff; opacity: 0.5; }
+        .btn-stop.active { opacity: 1; }
+
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 6px; margin-bottom: 10px; }
+        .metric-card { background: #141824; border: 1px solid var(--border-color); padding: 8px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+        .metric-title { font-size: 9px; color: var(--text-muted); font-weight: 600; }
+        .metric-value { font-size: 13px; font-weight: 700; margin-top: 2px; }
+
+        .btn-claim {
+            margin-top: 4px; background: var(--accent-yellow); color: #000; border: none;
+            border-radius: 4px; font-size: 9px; font-weight: 700; padding: 3px 6px;
+            cursor: pointer; text-transform: uppercase; align-self: center;
+        }
+
+        .btn-close-pos {
+            background: rgba(246, 70, 93, 0.2); color: var(--accent-red);
+            border: 1px solid var(--accent-red); padding: 3px 8px; border-radius: 4px;
+            font-size: 10px; font-weight: 700; cursor: pointer;
+        }
+
+        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 6px; border: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 500px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background: #141824; color: var(--text-muted); }
+
+        .terminal { background: #05070a; border-radius: 6px; padding: 8px; font-family: monospace; font-size: 10px; color: var(--accent-green); height: 85px; overflow-y: auto; margin-top: 8px; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); z-index: 4000; display: none;
+            justify-content: center; align-items: center; padding: 16px;
+        }
+        .modal-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 420px; padding: 16px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .modal-title { font-size: 14px; font-weight: 700; color: var(--accent-yellow); }
+        .close-modal { cursor: pointer; color: var(--text-muted); font-size: 16px; }
+
+        .admin-nav { display: flex; gap: 4px; border-bottom: 1px solid var(--border-color); margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; }
+        .admin-tab-btn { background: #141824; border: 1px solid var(--border-color); color: var(--text-muted); padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .admin-tab-btn.active { background: var(--accent-yellow); color: #000; border-color: var(--accent-yellow); }
+        .admin-section { display: none; }
+        .admin-section.active { display: block; }
+
+        .admin-code-badge {
+            background: #0d111a;
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            color: var(--accent-yellow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        #toastContainer { position: fixed; bottom: 20px; right: 20px; left: 20px; z-index: 5000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .toast { background: rgba(18, 23, 36, 0.95); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-yellow); padding: 12px; border-radius: 8px; color: #fff; font-size: 12px; pointer-events: auto; }
+        .toast.success { border-left-color: var(--accent-green); }
+        .toast.error { border-left-color: var(--accent-red); }
+    </style>
 </head>
 <body>
-  <header>
-    <div class="logo">⚡ SMC & FVG Bot Terminal</div>
-    <div class="nav-links">
-      <a href="index.html">Home</a>
-      <a href="dashboard.html">Dashboard</a>
-      <a href="admin.html">Admin</a>
-    </div>
-  </header>
 
-  <div class="container">
-    <div class="card" style="text-align: center; padding: 50px 20px;">
-      <h1 style="font-size: 36px; margin-bottom: 15px;">Automated Smart Money Crypto Bot</h1>
-      <p style="color: var(--text-muted); margin-bottom: 30px;">Trade with institutional precision using SMC, FVG logic, Auto Break-Even & Risk Management connected live with Bybit API.</p>
-      
-      <div style="margin-bottom: 25px;">
-        <input type="text" id="passcodeInput" placeholder="Enter Access Passcode" style="padding: 12px; width: 300px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--bg-color); color: white; margin-right: 10px;">
-        <button class="btn" onclick="verifyAccess()">Access Dashboard</button>
-      </div>
+<div id="toastContainer"></div>
+
+<div id="accessLandingPage">
+    <h1 class="hero-title"><i class="fa-solid fa-robot"></i> MY TRADING BOT ACCESS</h1>
+    <p class="hero-subtitle">Unlock Automated Spot Trading Strategy for OKX</p>
+
+    <div class="code-unlock-box">
+        <h3><i class="fa-solid fa-key"></i> Enter Access Passcode</h3>
+        <div class="code-input-group">
+            <input type="text" id="userPasscode" placeholder="ENTER CODE..." maxlength="25">
+            <button class="btn-unlock" onclick="verifyAndUnlockCode()">UNLOCK</button>
+        </div>
     </div>
 
-    <div class="grid-2">
-      <div class="card">
-        <h2>Standard Plan</h2>
-        <p style="color: var(--text-muted); margin: 15px 0;">Perfect for manual and semi-automated scalpers.</p>
-        <h3 style="color: var(--accent-green); font-size: 28px; margin-bottom: 15px;">$49 / mo</h3>
-        <button class="btn" onclick="location.href='dashboard.html'">Get Started</button>
-      </div>
-      <div class="card" style="border-color: var(--primary-blue);">
-        <h2>VIP Automated Bot</h2>
-        <p style="color: var(--text-muted); margin: 15px 0;">Full algorithmic SMC + FVG auto-execution bot.</p>
-        <h3 style="color: var(--accent-green); font-size: 28px; margin-bottom: 15px;">$99 / mo</h3>
-        <button class="btn" onclick="location.href='dashboard.html'">Get VIP Access</button>
-      </div>
-    </div>
-  </div>
+    <div class="pricing-container">
+        <div class="pricing-card tier-1">
+            <div>
+                <div class="plan-title"><i class="fa-solid fa-bolt"></i> Starter Plan</div>
+                <div class="plan-price">$10 <span>/ 7 Days Access</span></div>
+                <ul class="feature-list">
+                    <li><i class="fa-solid fa-circle-check"></i> 7 Days Unrestricted Bot Access</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Automated Entry Execution</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Real-time OKX Live Data Feed</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Standard Risk Management</li>
+                </ul>
+            </div>
+            <button class="btn-buy" onclick="openPurchaseModal('7 Days', 10)"><i class="fa-solid fa-lock-open"></i> Buy / Unlock Plan</button>
+        </div>
 
-  <script src="script.js"></script>
+        <div class="pricing-card tier-2">
+            <div>
+                <div class="plan-title"><i class="fa-solid fa-shield-halved"></i> Pro Trader</div>
+                <div class="plan-price">$15 <span>/ 14 Days Access</span></div>
+                <ul class="feature-list">
+                    <li><i class="fa-solid fa-circle-check"></i> 14 Days Full Bot Access</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Advanced Automated Logic + Auto Break-Even</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Real-time OKX Data & Interactive Chart</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Multi-coin Spot Pair Selector</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Priority Execution Speed</li>
+                </ul>
+            </div>
+            <button class="btn-buy" onclick="openPurchaseModal('14 Days', 15)"><i class="fa-solid fa-lock-open"></i> Buy / Unlock Plan</button>
+        </div>
+
+        <div class="pricing-card tier-3">
+            <div class="badge-popular">Best Value</div>
+            <div>
+                <div class="plan-title"><i class="fa-solid fa-crown"></i> VIP Unlimited</div>
+                <div class="plan-price">$36 <span>/ 30 Days Access</span></div>
+                <ul class="feature-list">
+                    <li><i class="fa-solid fa-circle-check"></i> 30 Days VIP Full Access</li>
+                    <li><i class="fa-solid fa-circle-check"></i> All Advanced Automated Strategies</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Custom RR Ratio & Risk Control Cap</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Live Position Tracking & Terminal Logs</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Admin Support & Custom Trading Pairs</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Auto Capital Saver Protection</li>
+                </ul>
+            </div>
+            <button class="btn-buy" onclick="openPurchaseModal('30 Days VIP', 36)"><i class="fa-solid fa-crown"></i> Buy / Unlock Plan</button>
+        </div>
+    </div>
+
+    <button class="secret-admin-btn" onclick="openPageOneAdminModal()">
+        <i class="fa-solid fa-lock"></i> Admin
+    </button>
+</div>
+
+<div class="modal-overlay" id="purchaseModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-brands fa-whatsapp" style="color:#25D366;"></i> Purchase Access Code</div>
+            <i class="fa-solid fa-xmark close-modal" onclick="closeModals()"></i>
+        </div>
+        <div class="wa-contact-box">
+            <p class="wa-notice-en">⚠️ Please contact on WhatsApp to purchase the bot access code first!</p>
+            <p class="wa-notice-ur">⚠️ dynamic access code haasil karne ke liye pehle WhatsApp par contact karke bot purchase karein.</p>
+            
+            <a href="#" id="waContactLink" target="_blank" class="btn-whatsapp-direct">
+                <i class="fa-brands fa-whatsapp" style="font-size: 18px;"></i> Contact Admin on WhatsApp
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="adminModal">
+    <div class="modal-card" style="max-width: 550px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-user-shield"></i> Master Admin Dashboard</div>
+            <i class="fa-solid fa-xmark close-modal" onclick="closeModals()"></i>
+        </div>
+
+        <div id="adminAuthBox">
+            <div class="form-group">
+                <label>Enter Admin Password</label>
+                <input type="password" id="adminPasswordInput" placeholder="Password daalein...">
+            </div>
+            <button class="btn btn-start" style="width:100%" onclick="authenticateAdmin()">Login to Admin</button>
+        </div>
+
+        <div id="adminContentBox" style="display:none;">
+            <div class="admin-nav" id="adminNavTabs">
+                <button class="admin-tab-btn active" onclick="switchAdminTab('tab-codes')"><i class="fa-solid fa-key"></i> Passcodes Generator</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('tab-users')"><i class="fa-solid fa-users"></i> Users</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('tab-finance')"><i class="fa-solid fa-money-bill-transfer"></i> Financials</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('tab-bot')"><i class="fa-solid fa-gears"></i> Bot Control</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('tab-trades')"><i class="fa-solid fa-chart-line"></i> Active Trades</button>
+            </div>
+
+            <div class="admin-section active" id="tab-codes">
+                <h4 style="font-size:11px; color:var(--accent-yellow); margin-bottom:8px;">Live One-Time Use Short Passcodes (6-7 Chars)</h4>
+                
+                <div style="margin-bottom: 12px; background: rgba(0, 242, 254, 0.08); padding: 6px; border-radius:6px; border:1px dashed var(--accent-blue);">
+                    <span style="font-size:11px; color:var(--accent-blue); font-weight:700;">⏱️ 20 Seconds Test Code (e.g. T20-X89):</span>
+                    <div id="codesList20Sec" style="margin-top:4px;"></div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <span style="font-size:11px; color:var(--accent-green); font-weight:700;">🟢 7 Days Access Codes (e.g. 7D-K9P2):</span>
+                    <div id="codesList7Days" style="margin-top:4px;"></div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <span style="font-size:11px; color:var(--accent-yellow); font-weight:700;">🟡 14 Days Access Codes (e.g. 14D-M3Q1):</span>
+                    <div id="codesList14Days" style="margin-top:4px;"></div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <span style="font-size:11px; color:var(--accent-purple); font-weight:700;">🟣 30 Days VIP Access Codes (e.g. 30D-R4T8):</span>
+                    <div id="codesList30Days" style="margin-top:4px;"></div>
+                </div>
+            </div>
+
+            <div class="admin-section" id="tab-users">
+                <h4 style="font-size:11px; color:var(--accent-yellow); margin-bottom:8px;">User Control & Wallet Adjustments</h4>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>User UID</th><th>Balance</th><th>Status</th><th>Action</th></tr>
+                        </thead>
+                        <tbody id="adminUserListTable">
+                            <tr>
+                                <td>UID-781988</td>
+                                <td>$<span id="adminUserBalDisp">100.00</span></td>
+                                <td><span style="color:var(--accent-green); font-weight:700;" id="userAccStatus">Active</span></td>
+                                <td>
+                                    <button class="btn-claim" onclick="adminAdjustWallet()">Edit $</button>
+                                    <button class="btn-close-pos" onclick="adminToggleUserStatus()">Freeze</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="admin-section" id="tab-finance">
+                <h4 style="font-size:11px; color:var(--accent-yellow); margin-bottom:8px;">Pending Deposits & Withdrawals</h4>
+                <div class="table-wrapper" style="max-height: 220px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>Type</th><th>Amount</th><th>Details</th><th>Action</th></tr>
+                        </thead>
+                        <tbody id="adminRequestsTable">
+                            <tr><td colspan="4" style="text-align:center;">No pending requests</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="admin-section" id="tab-bot">
+                <h4 style="font-size:11px; color:var(--accent-yellow); margin-bottom:8px;">Master Bot & Risk Rules</h4>
+                <div class="toggle-box">
+                    <span style="font-size:11px;">Global System Emergency Switch</span>
+                    <button class="btn-close-pos" onclick="toggleGlobalBotSwitch()" id="globalSwitchBtn">Pause All</button>
+                </div>
+                <div class="form-group">
+                    <label>Max Allowed Risk Per Trade (%) Cap</label>
+                    <input type="number" id="adminMaxRiskCap" value="10">
+                </div>
+                <div class="form-group">
+                    <label>Add New Spot Pair (OKX Format)</label>
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="adminNewCoin" placeholder="e.g. MOODENG-USDT">
+                        <button class="btn btn-start" style="width: auto; padding: 0 12px;" onclick="adminAddCoin()">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-section" id="tab-trades">
+                <h4 style="font-size:11px; color:var(--accent-yellow); margin-bottom:8px;">Live Running Trades Monitoring</h4>
+                <div id="adminActiveTradeView" style="font-size:11px; color:var(--text-muted);">
+                    No active positions running across platform.
+                </div>
+                <button class="btn-close-pos" style="margin-top:8px; width:100%; display:none;" id="adminForceCloseBtn" onclick="adminForceCloseTrade()">Force Close Active Position</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="mainBotDashboard">
+    <div class="modal-overlay" id="depositModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fa-solid fa-arrow-down"></i> Deposit Funds</div>
+                <i class="fa-solid fa-xmark close-modal" onclick="closeModals()"></i>
+            </div>
+            <div class="form-group">
+                <label>Select Network</label>
+                <select id="depNetwork"><option>USDT (TRC20)</option><option>USDT (BEP20)</option></select>
+            </div>
+            <div class="form-group">
+                <label>Amount ($)</label>
+                <input type="number" id="depAmount" placeholder="Enter Amount">
+            </div>
+            <div class="form-group">
+                <label>Transaction Hash / TxID</label>
+                <input type="text" id="depTxid" placeholder="Paste TxID / Hash">
+            </div>
+            <button class="btn btn-start" style="width:100%" onclick="submitDeposit()">Submit Deposit Request</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="withdrawModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fa-solid fa-arrow-up"></i> Withdraw Funds</div>
+                <i class="fa-solid fa-xmark close-modal" onclick="closeModals()"></i>
+            </div>
+            <div class="form-group">
+                <label>Withdrawal Wallet Address</label>
+                <input type="text" id="withAddress" placeholder="Paste TRC20 / BEP20 Address">
+            </div>
+            <div class="form-group">
+                <label>Amount ($)</label>
+                <input type="number" id="withAmount" placeholder="Enter Amount">
+            </div>
+            <button class="btn btn-stop active" style="width:100%" onclick="submitWithdraw()">Submit Withdraw Request</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="active-plan-banner" id="activePlanBanner">
+            <span><i class="fa-solid fa-clock"></i> Active Access: <b id="activePlanTitle">7 Days Access</b></span>
+            <span id="activePlanExpiry">Expires in: 7d 00h</span>
+        </div>
+
+        <header>
+            <div class="header-top-row">
+                <div>
+                    <div class="logo"><i class="fa-solid fa-robot"></i> MY TRADING BOT</div>
+                    <div class="uid-tag">UID: UID-781988</div>
+                </div>
+
+                <div class="header-balance-badge">
+                    <div class="header-balance-title">Total Wallet</div>
+                    <div class="header-balance-val" id="headerBalance">$100.00</div>
+                </div>
+            </div>
+
+            <div class="header-bottom-row">
+                <button class="hdr-btn hdr-dep" onclick="openModal('depositModal')"><i class="fa-solid fa-arrow-down"></i> Deposit</button>
+                <button class="hdr-btn hdr-with" onclick="openModal('withdrawModal')"><i class="fa-solid fa-arrow-up"></i> Withdraw</button>
+                <div class="status-badge" id="statusBadge"><span id="statusText">STOPPED</span></div>
+                <button class="admin-toggle-btn" onclick="openFullAdminModal()"><i class="fa-solid fa-lock"></i> Admin Panel</button>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card" style="padding: 10px;">
+                <h2><span id="chartSymbolTitle">MOODENG-USDT | 15M</span></h2>
+                <div class="chart-wrapper">
+                    <div id="chartContainer"></div>
+                    <div class="chart-signal-bar">
+                        <span>Live Price: <b id="liveChartPrice" style="color:var(--accent-yellow)">Fetching...</b></span>
+                        <span id="lastChartSignal">Signal Status: <b style="color:var(--text-muted)">Scanning Setup...</b></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fa-solid fa-sliders"></i> Strategy & Risk Control</h2>
+
+                <div class="toggle-box">
+                    <span style="font-size:11px;">Auto Break-Even (At 1:1.5 RR)</span>
+                    <input type="checkbox" id="breakEvenFilter" checked style="width: auto;">
+                </div>
+
+                <div class="form-group search-select-box">
+                    <label>Search & Select OKX Spot Coin</label>
+                    <input type="text" id="coinSearchInput" placeholder="Search coin..." onfocus="showCoins()" oninput="filterCoins()">
+                    <div class="coin-dropdown" id="coinDropdown"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Allocated Bot Capital ($)</label>
+                    <input type="number" id="botBalance" value="50">
+                </div>
+
+                <div class="form-group">
+                    <label>Risk Per Trade (%)</label>
+                    <input type="number" id="riskPercent" value="5">
+                </div>
+
+                <div class="form-group">
+                    <label>Target RR (1 : X)</label>
+                    <input type="number" id="rrRatio" value="3">
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-start" onclick="startTrading()">Start Algo</button>
+                    <button class="btn btn-stop" id="stopBtn" onclick="stopTrading()">Stop Algo</button>
+                </div>
+            </div>
+
+            <div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-title">Total Trades</div>
+                        <div class="metric-value" id="statTotalTrades">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Win Rate</div>
+                        <div class="metric-value" style="color:var(--accent-green)" id="statWinRate">0%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Session PnL</div>
+                        <div class="metric-value" style="color:var(--accent-yellow)" id="dispSessionProfit">$0.00</div>
+                        <button class="btn-claim" onclick="claimSessionProfit()"><i class="fa-solid fa-hand-holding-dollar"></i> Claim</button>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 10px;">
+                    <h2><i class="fa-solid fa-box"></i> Spot Active Holding (Real-time PnL)</h2>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Coin</th>
+                                    <th>Entry Price</th>
+                                    <th>Current Price</th>
+                                    <th>SL / TP Price</th>
+                                    <th>Live PnL ($)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="openPositionTable">
+                                <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No Active Spot Position</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><i class="fa-solid fa-list"></i> Trade Signals Log</h2>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pair</th>
+                                    <th>PnL ($)</th>
+                                    <th>Bot Capital</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tradeLogs">
+                                <tr><td colspan="3" style="text-align:center;">Select coin and start algorithm.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="terminal" id="sysTerminal">> Connected to Live OKX Data Feed. Waiting for setup confirmation...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const adminWhatsAppNumber = "923000000000"; 
+
+    let okxSpotCoins = [
+        "MOODENG-USDT", "XRP-USDT", "SOL-USDT", "BTC-USDT", "ETH-USDT", "DOGE-USDT", 
+        "ADA-USDT", "AVAX-USDT", "LINK-USDT", "DOT-USDT", "MATIC-USDT",
+        "PEPE-USDT", "SHIB-USDT", "LTC-USDT", "BCH-USDT", "NEAR-USDT",
+        "APT-USDT", "SUI-USDT", "ORDI-USDT", "TIA-USDT", "INJ-USDT"
+    ];
+
+    let selectedCoin = "MOODENG-USDT";
+    let isRunning = false;
+    let sessionProfit = 0;
+    let totalWalletBalance = 100.00;
+    let botCapital = 50;
+    let totalTrades = 0;
+    let winTrades = 0;
+    let adminRequests = [];
+    let isUserFrozen = false;
+    let globalBotSystemPaused = false;
+
+    let currentMarketPrice = 0.04401; 
+    let previousTickPrice = 0.04401;
+    let spotHolding = null;
+    let isPageOneAdminOnly = false;
+    let isAdminLoggedIn = false;
+
+    let activeAccessCodeObj = null;
+
+    let generatedCodes = {
+        tier20Sec: [],
+        tier7: [],
+        tier14: [],
+        tier30: []
+    };
+
+    function generateRandomCode(prefix, len = 3) {
+        let chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+        let res = prefix + "-";
+        for(let i=0; i<len; i++) {
+            res += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return res;
+    }
+
+    function initAdminCodes() {
+        let savedCodes = localStorage.getItem("bot_generated_codes");
+        if(savedCodes) {
+            generatedCodes = JSON.parse(savedCodes);
+            if(!generatedCodes.tier20Sec) generatedCodes.tier20Sec = [];
+        } 
+        
+        if(!generatedCodes.tier20Sec || generatedCodes.tier20Sec.length === 0) {
+            generatedCodes.tier20Sec = [{ code: generateRandomCode("T20", 3), seconds: 20, plan: "20 Seconds Test" }];
+        }
+        if(!generatedCodes.tier7 || generatedCodes.tier7.length === 0) {
+            generatedCodes.tier7 = [];
+            for(let i=0; i<5; i++) generatedCodes.tier7.push({ code: generateRandomCode("7D", 4), days: 7, plan: "7 Days Access" });
+        }
+        if(!generatedCodes.tier14 || generatedCodes.tier14.length === 0) {
+            generatedCodes.tier14 = [];
+            for(let i=0; i<5; i++) generatedCodes.tier14.push({ code: generateRandomCode("14D", 4), days: 14, plan: "14 Days Access" });
+        }
+        if(!generatedCodes.tier30 || generatedCodes.tier30.length === 0) {
+            generatedCodes.tier30 = [];
+            for(let i=0; i<5; i++) generatedCodes.tier30.push({ code: generateRandomCode("30D", 4), days: 30, plan: "30 Days VIP" });
+        }
+        saveCodesToStorage();
+    }
+
+    function saveCodesToStorage() {
+        localStorage.setItem("bot_generated_codes", JSON.stringify(generatedCodes));
+    }
+
+    function renderAdminCodesList() {
+        renderCodeCategory("codesList20Sec", generatedCodes.tier20Sec);
+        renderCodeCategory("codesList7Days", generatedCodes.tier7);
+        renderCodeCategory("codesList14Days", generatedCodes.tier14);
+        renderCodeCategory("codesList30Days", generatedCodes.tier30);
+    }
+
+    function renderCodeCategory(elementId, codeArray) {
+        let el = document.getElementById(elementId);
+        if(!el) return;
+        el.innerHTML = "";
+        codeArray.forEach((item) => {
+            el.innerHTML += `
+                <div class="admin-code-badge">
+                    <span><b>${item.code}</b> (${item.plan})</span>
+                    <button class="btn-claim" onclick="copyCodeToClipboard('${item.code}')"><i class="fa-solid fa-copy"></i> Copy</button>
+                </div>
+            `;
+        });
+    }
+
+    function copyCodeToClipboard(text) {
+        navigator.clipboard.writeText(text);
+        showToast(`Copied ${text} to Clipboard!`, "success");
+    }
+
+    function openPageOneAdminModal() {
+        isPageOneAdminOnly = true;
+        document.getElementById("adminNavTabs").style.display = "none";
+        switchAdminTab('tab-codes');
+        openModal('adminModal');
+    }
+
+    function openFullAdminModal() {
+        isPageOneAdminOnly = false;
+        document.getElementById("adminNavTabs").style.display = "flex";
+        openModal('adminModal');
+    }
+
+    function verifyAndUnlockCode() {
+        let userCode = document.getElementById("userPasscode").value.trim().toUpperCase();
+        if(!userCode) {
+            showToast("Please enter an access passcode!", "error");
+            return;
+        }
+
+        let foundMatch = null;
+
+        ['tier20Sec', 'tier7', 'tier14', 'tier30'].forEach(key => {
+            let idx = generatedCodes[key].findIndex(c => c.code === userCode);
+            if(idx !== -1) {
+                foundMatch = generatedCodes[key][idx];
+                generatedCodes[key].splice(idx, 1);
+                
+                if(key === 'tier20Sec') {
+                    generatedCodes[key].push({ code: generateRandomCode("T20", 3), seconds: 20, plan: "20 Seconds Test" });
+                } else {
+                    let newDays = key === 'tier7' ? 7 : (key === 'tier14' ? 14 : 30);
+                    let newPrefix = key === 'tier7' ? '7D' : (key === 'tier14' ? '14D' : '30D');
+                    let newPlanName = key === 'tier7' ? '7 Days Access' : (key === 'tier14' ? '14 Days Access' : '30 Days VIP');
+                    generatedCodes[key].push({ code: generateRandomCode(newPrefix, 4), days: newDays, plan: newPlanName });
+                }
+                saveCodesToStorage();
+                renderAdminCodesList();
+            }
+        });
+
+        if(foundMatch) {
+            let expiryTimestamp = foundMatch.seconds ? Date.now() + (foundMatch.seconds * 1000) : Date.now() + (foundMatch.days * 24 * 60 * 60 * 1000);
+            activeAccessCodeObj = {
+                plan: foundMatch.plan,
+                days: foundMatch.days || 0,
+                seconds: foundMatch.seconds || 0,
+                expiry: expiryTimestamp
+            };
+            localStorage.setItem("bot_active_access", JSON.stringify(activeAccessCodeObj));
+            document.getElementById("userPasscode").value = "";
+            showToast(`Passcode Accepted! ${foundMatch.plan} Unlocked.`, "success");
+            switchToDashboard();
+        } else {
+            document.getElementById("userPasscode").value = "";
+            showToast("Invalid or Already Used Access Passcode!", "error");
+        }
+    }
+
+    function checkActiveAccessValidity() {
+        let savedAccess = localStorage.getItem("bot_active_access");
+        if(savedAccess) {
+            let accessObj = JSON.parse(savedAccess);
+            if(Date.now() < accessObj.expiry) {
+                activeAccessCodeObj = accessObj;
+                switchToDashboard();
+                return true;
+            } else {
+                localStorage.removeItem("bot_active_access");
+                if(isRunning) stopTrading();
+                showToast("Your Access Subscription has expired. Please buy a new passcode.", "error");
+            }
+        }
+        document.getElementById("accessLandingPage").style.display = "flex";
+        document.getElementById("mainBotDashboard").style.display = "none";
+        return false;
+    }
+
+    function updateAccessTimerUI() {
+        if(!activeAccessCodeObj) return;
+        let diffMs = activeAccessCodeObj.expiry - Date.now();
+        if(diffMs <= 0) {
+            localStorage.removeItem("bot_active_access");
+            activeAccessCodeObj = null;
+            if(isRunning) stopTrading();
+            document.getElementById("accessLandingPage").style.display = "flex";
+            document.getElementById("mainBotDashboard").style.display = "none";
+            showToast("Access Expired!", "error");
+            return;
+        }
+
+        if(activeAccessCodeObj.seconds) {
+            let secRem = Math.ceil(diffMs / 1000);
+            document.getElementById("activePlanExpiry").innerText = `Expires in: ${secRem}s`;
+        } else {
+            let diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            document.getElementById("activePlanExpiry").innerText = `Expires in: ${diffDays} Days`;
+        }
+    }
+
+    function switchToDashboard() {
+        document.getElementById("accessLandingPage").style.display = "none";
+        document.getElementById("mainBotDashboard").style.display = "block";
+        
+        if(activeAccessCodeObj) {
+            document.getElementById("activePlanTitle").innerText = activeAccessCodeObj.plan;
+            updateAccessTimerUI();
+        }
+    }
+
+    function openPurchaseModal(planName, price) {
+        let textMsg = encodeURIComponent(`Hello Admin, I want to purchase the OKX Trading Bot (${planName} Plan - $${price}). Please provide payment details and Access Code.`);
+        document.getElementById("waContactLink").href = `https://wa.me/${adminWhatsAppNumber}?text=${textMsg}`;
+        openModal("purchaseModal");
+    }
+
+    window.onload = function() {
+        initAdminCodes();
+        renderAdminCodesList();
+        loadPersistentState();
+        checkActiveAccessValidity();
+
+        document.getElementById("coinSearchInput").value = selectedCoin;
+        populateCoinList(okxSpotCoins);
+        renderTradingViewChart(selectedCoin);
+        fetchOKXRealPrice();
+        setInterval(fetchOKXRealPrice, 1000);
+        setInterval(updateAccessTimerUI, 1000);
+    };
+
+    function savePersistentState() {
+        let state = {
+            selectedCoin,
+            isRunning,
+            sessionProfit,
+            totalWalletBalance,
+            botCapital,
+            totalTrades,
+            winTrades,
+            spotHolding,
+            isAdminLoggedIn,
+            riskPercent: document.getElementById("riskPercent").value,
+            rrRatio: document.getElementById("rrRatio").value,
+            breakEvenFilter: document.getElementById("breakEvenFilter").checked,
+            tradeLogsHtml: document.getElementById("tradeLogs").innerHTML,
+            terminalHtml: document.getElementById("sysTerminal").innerHTML
+        };
+        localStorage.setItem("trading_bot_state", JSON.stringify(state));
+    }
+
+    function loadPersistentState() {
+        let saved = localStorage.getItem("trading_bot_state");
+        if(saved) {
+            try {
+                let state = JSON.parse(saved);
+                selectedCoin = state.selectedCoin || "MOODENG-USDT";
+                isRunning = state.isRunning || false;
+                sessionProfit = state.sessionProfit || 0;
+                totalWalletBalance = state.totalWalletBalance || 100.00;
+                botCapital = state.botCapital || 50;
+                totalTrades = state.totalTrades || 0;
+                winTrades = state.winTrades || 0;
+                spotHolding = state.spotHolding || null;
+                isAdminLoggedIn = state.isAdminLoggedIn || false;
+
+                if(state.riskPercent) document.getElementById("riskPercent").value = state.riskPercent;
+                if(state.rrRatio) document.getElementById("rrRatio").value = state.rrRatio;
+                if(state.breakEvenFilter !== undefined) document.getElementById("breakEvenFilter").checked = state.breakEvenFilter;
+                if(state.tradeLogsHtml) document.getElementById("tradeLogs").innerHTML = state.tradeLogsHtml;
+                if(state.terminalHtml) document.getElementById("sysTerminal").innerHTML = state.terminalHtml;
+
+                document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toFixed(2)}`;
+                document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
+                document.getElementById("botBalance").value = botCapital.toFixed(2);
+                document.getElementById("dispSessionProfit").innerText = `$${sessionProfit.toFixed(2)}`;
+                document.getElementById("statTotalTrades").innerText = totalTrades;
+                document.getElementById("statWinRate").innerText = totalTrades > 0 ? `${((winTrades / totalTrades) * 100).toFixed(0)}%` : "0%";
+
+                if(isRunning) {
+                    document.getElementById("statusBadge").classList.add("active");
+                    document.getElementById("statusText").innerText = "RUNNING";
+                    document.getElementById("stopBtn").classList.add("active");
+                }
+            } catch(e) { console.error("Error loading state", e); }
+        }
+    }
+
+    function authenticateAdmin() {
+        let inputPass = document.getElementById("adminPasswordInput").value;
+        if(inputPass === "MalikSabkaBot") {
+            isAdminLoggedIn = true;
+            document.getElementById("adminAuthBox").style.display = "none";
+            document.getElementById("adminContentBox").style.display = "block";
+            
+            if(isPageOneAdminOnly) {
+                document.getElementById("adminNavTabs").style.display = "none";
+                switchAdminTab('tab-codes');
+            } else {
+                document.getElementById("adminNavTabs").style.display = "flex";
+            }
+
+            renderAdminCodesList();
+            showToast("Admin Authenticated Successfully!", "success");
+            savePersistentState();
+        } else {
+            showToast("Incorrect Admin Password!", "error");
+        }
+    }
+
+    function switchAdminTab(tabId) {
+        document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+        
+        let activeBtn = Array.from(document.querySelectorAll('.admin-tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+        if(activeBtn) activeBtn.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    function renderTradingViewChart(coin) {
+        const symbol = "OKX:" + coin.replace("-", "");
+        const container = document.getElementById("chartContainer");
+        container.innerHTML = `<iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=${symbol}&interval=15&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC" style="width: 100%; height: 320px; border: none;"></iframe>`;
+        document.getElementById("chartSymbolTitle").innerText = `${coin} | 15M`;
+    }
+
+    async function fetchOKXRealPrice() {
+        let instId = selectedCoin.toUpperCase();
+        let binanceSymbol = instId.replace("-", "");
+        let fetched = false;
+
+        previousTickPrice = currentMarketPrice;
+
+        try {
+            let response = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`);
+            let data = await response.json();
+            if(data && data.data && data.data[0] && data.data[0].last) {
+                currentMarketPrice = parseFloat(data.data[0].last);
+                fetched = true;
+            }
+        } catch(e) {}
+
+        if(!fetched) {
+            try {
+                let backupRes = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`);
+                let backupData = await backupRes.json();
+                if(backupData && backupData.price) {
+                    currentMarketPrice = parseFloat(backupData.price);
+                    fetched = true;
+                }
+            } catch(err) {}
+        }
+
+        if(!fetched && instId.includes("MOODENG")) {
+            currentMarketPrice = 0.04401; 
+        }
+        
+        let formattedPrice = currentMarketPrice < 1 ? currentMarketPrice.toFixed(5) : currentMarketPrice.toFixed(4);
+        document.getElementById("liveChartPrice").innerText = `$${formattedPrice}`;
+        
+        if (isRunning && !globalBotSystemPaused && !isUserFrozen) {
+            processBotTradingLogic();
+        }
+        updateAdminTradeMonitoring();
+        savePersistentState();
+    }
+
+    function startTrading() {
+        if(isUserFrozen) { showToast("Your Account is Frozen by Admin!", "error"); return; }
+        if(globalBotSystemPaused) { showToast("Bot System Paused Globally by Admin!", "error"); return; }
+        if(isRunning) return;
+        
+        let userCap = parseFloat(document.getElementById("botBalance").value);
+        if(!isNaN(userCap) && userCap > 0) botCapital = userCap;
+
+        isRunning = true;
+        document.getElementById("statusBadge").classList.add("active");
+        document.getElementById("statusText").innerText = "RUNNING";
+        document.getElementById("stopBtn").classList.add("active");
+
+        showToast(`Algo Started ($${botCapital.toFixed(2)}). Scanning setup...`, "success");
+        logConsole(`> Algo Started on ${selectedCoin}. Waiting for setup confirmation...`);
+        savePersistentState();
+    }
+
+    function stopTrading() {
+        if(!isRunning) return;
+        
+        if(spotHolding) {
+            let priceDiff = currentMarketPrice - spotHolding.buyPrice;
+            let manualPnL = (priceDiff / spotHolding.buyPrice) * spotHolding.cost;
+            closePosition('STOP_ALGO_CLOSED', manualPnL);
+        }
+
+        isRunning = false;
+        document.getElementById("statusBadge").classList.remove("active");
+        document.getElementById("statusText").innerText = "STOPPED";
+        document.getElementById("stopBtn").classList.remove("active");
+        document.getElementById("lastChartSignal").innerHTML = `Signal Status: <b style="color:var(--text-muted)">Idle</b>`;
+        showToast("Algo Stopped & Positions Closed", "error");
+        logConsole(`> Algo Stopped by user. All active trades closed.`);
+        savePersistentState();
+    }
+
+    function processBotTradingLogic() {
+        let riskPct = parseFloat(document.getElementById("riskPercent").value) || 5;
+        let maxRiskCap = parseFloat(document.getElementById("adminMaxRiskCap").value) || 10;
+        
+        if(riskPct > maxRiskCap) {
+            riskPct = maxRiskCap;
+            document.getElementById("riskPercent").value = maxRiskCap;
+            showToast(`Risk capped at max allowed ${maxRiskCap}% by Admin rules`, "error");
+        }
+
+        let rrRatio = parseFloat(document.getElementById("rrRatio").value) || 3;
+        let autoBE = document.getElementById("breakEvenFilter").checked;
+
+        if (!spotHolding) {
+            let isTriggered = currentMarketPrice > previousTickPrice; 
+
+            if (!isTriggered) {
+                document.getElementById("lastChartSignal").innerHTML = `Signal Status: <b style="color:var(--accent-yellow)">Waiting for Setup Touch</b>`;
+                return; 
+            }
+
+            let buyPrice = currentMarketPrice; 
+            let distance = buyPrice * 0.012; 
+            let slPrice = buyPrice - distance;
+            
+            let riskPerCoin = buyPrice - slPrice;
+            let tpPrice = buyPrice + (riskPerCoin * rrRatio);
+
+            let totalRiskAmount = botCapital * (riskPct / 100);
+
+            spotHolding = {
+                coin: selectedCoin,
+                buyPrice: buyPrice,
+                cost: botCapital,
+                qty: botCapital / buyPrice,
+                slPrice: slPrice,
+                tpPrice: tpPrice,
+                initialRiskPrice: riskPerCoin,
+                beTriggered: false,
+                totalRiskAmount: totalRiskAmount
+            };
+
+            renderSpotHoldingUI();
+            document.getElementById("lastChartSignal").innerHTML = `Signal Status: <b style="color:var(--accent-green)">BUY Active</b>`;
+
+            logConsole(`> [ENTRY EXECUTION] Setup Confirmed on ${selectedCoin} @ $${buyPrice.toFixed(5)} | SL: $${slPrice.toFixed(5)} | TP: $${tpPrice.toFixed(5)}`);
+            showToast(`Setup Confirmed! BUY Trade Executed.`, "success");
+            savePersistentState();
+            return;
+        }
+
+        let targetBEPrice = spotHolding.buyPrice + (spotHolding.initialRiskPrice * 1.5);
+        if (autoBE && !spotHolding.beTriggered && currentMarketPrice >= targetBEPrice) {
+            spotHolding.slPrice = spotHolding.buyPrice;
+            spotHolding.beTriggered = true;
+            logConsole(`> [AUTO BREAK-EVEN] Price reached 1:1.5 RR. SL moved to Entry ($${spotHolding.buyPrice.toFixed(5)})`);
+            showToast(`Auto Break-Even Triggered! SL set to Entry`, "success");
+        }
+
+        renderSpotHoldingUI();
+
+        if (currentMarketPrice >= spotHolding.tpPrice) {
+            let tpProfit = spotHolding.totalRiskAmount * rrRatio;
+            closePosition('TAKE_PROFIT', tpProfit);
+        } 
+        else if (currentMarketPrice <= spotHolding.slPrice) {
+            let finalLoss = spotHolding.beTriggered ? 0 : -spotHolding.totalRiskAmount;
+            closePosition(spotHolding.beTriggered ? 'BREAK_EVEN' : 'STOP_LOSS', finalLoss);
+        }
+    }
+
+    function closePosition(reason, pnl) {
+        if (!spotHolding) return;
+
+        let isWin = pnl > 0;
+        botCapital += pnl;
+        sessionProfit += pnl;
+        totalTrades++;
+        if (isWin) winTrades++;
+
+        totalWalletBalance += pnl; 
+        document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
+
+        document.getElementById("botBalance").value = botCapital.toFixed(2);
+        document.getElementById("dispSessionProfit").innerText = `$${sessionProfit.toFixed(2)}`;
+        document.getElementById("statTotalTrades").innerText = totalTrades;
+        document.getElementById("statWinRate").innerText = `${((winTrades / totalTrades) * 100).toFixed(0)}%`;
+
+        renderSingleLog({
+            coin: spotHolding.coin,
+            pnl: pnl,
+            botBal: botCapital,
+            isWin: isWin
+        });
+
+        document.getElementById("lastChartSignal").innerHTML = `Signal Status: <b style="color:${isWin ? 'var(--accent-green)' : 'var(--accent-red)'}">Closed (${reason})</b>`;
+        logConsole(`> [SPOT SELL] ${reason} Hit! Final PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`);
+        showToast(`Trade Closed (${reason}): ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`, isWin ? "success" : "error");
+
+        spotHolding = null;
+        renderSpotHoldingUI();
+        savePersistentState();
+    }
+
+    function renderSpotHoldingUI() {
+        let tbody = document.getElementById("openPositionTable");
+        if (!spotHolding) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No Active Spot Position (Scanning)</td></tr>`;
+            return;
+        }
+
+        let priceDiff = currentMarketPrice - spotHolding.buyPrice;
+        let pnlDollars = (priceDiff / spotHolding.buyPrice) * spotHolding.cost;
+        let pnlPercent = (priceDiff / spotHolding.buyPrice) * 100;
+
+        let pnlColor = pnlDollars >= 0 ? '#0ecb81' : '#f6465d';
+        let pnlSign = pnlDollars >= 0 ? '+' : '';
+
+        let dec = spotHolding.buyPrice < 1 ? 5 : 4;
+
+        tbody.innerHTML = `<tr>
+            <td><b>${spotHolding.coin}</b></td>
+            <td>$${spotHolding.buyPrice.toFixed(dec)}</td>
+            <td style="color:var(--accent-yellow)">$${currentMarketPrice.toFixed(dec)}</td>
+            <td><small>SL: $${spotHolding.slPrice.toFixed(dec)}<br>TP: $${spotHolding.tpPrice.toFixed(dec)}</small></td>
+            <td style="color:${pnlColor}; font-weight:700;">${pnlSign}$${pnlDollars.toFixed(2)} (${pnlSign}${pnlPercent.toFixed(2)}%)</td>
+        </tr>`;
+    }
+
+    function adminAdjustWallet() {
+        let newBal = prompt("Enter new total wallet balance for UID-781988:", totalWalletBalance);
+        if(newBal !== null && !isNaN(newBal)) {
+            totalWalletBalance = parseFloat(newBal);
+            document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
+            showToast("User Wallet Adjusted by Admin", "success");
+            savePersistentState();
+        }
+    }
+
+    function adminToggleUserStatus() {
+        isUserFrozen = !isUserFrozen;
+        document.getElementById("userAccStatus").innerText = isUserFrozen ? "Frozen" : "Active";
+        document.getElementById("userAccStatus").style.color = isUserFrozen ? "var(--accent-red)" : "var(--accent-green)";
+        if(isUserFrozen && isRunning) stopTrading();
+        showToast(`User Account ${isUserFrozen ? 'Frozen' : 'Unfrozen'}`, "error");
+    }
+
+    function toggleGlobalBotSwitch() {
+        globalBotSystemPaused = !globalBotSystemPaused;
+        let btn = document.getElementById("globalSwitchBtn");
+        btn.innerText = globalBotSystemPaused ? "Resume All" : "Pause All";
+        btn.style.background = globalBotSystemPaused ? "var(--accent-green)" : "";
+        if(globalBotSystemPaused && isRunning) stopTrading();
+        showToast(`Global Bot System ${globalBotSystemPaused ? 'Paused' : 'Resumed'}`, "error");
+    }
+
+    function adminAddCoin() {
+        let input = document.getElementById("adminNewCoin").value.toUpperCase().trim();
+        if(input && !okxSpotCoins.includes(input)) {
+            okxSpotCoins.unshift(input);
+            populateCoinList(okxSpotCoins);
+            selectCoin(input);
+            document.getElementById("adminNewCoin").value = "";
+            showToast(`Added ${input} to OKX List!`, "success");
+        }
+    }
+
+    function updateAdminTradeMonitoring() {
+        let view = document.getElementById("adminActiveTradeView");
+        let btn = document.getElementById("adminForceCloseBtn");
+        if(spotHolding) {
+            let priceDiff = currentMarketPrice - spotHolding.buyPrice;
+            let pnl = (priceDiff / spotHolding.buyPrice) * spotHolding.cost;
+            let dec = spotHolding.buyPrice < 1 ? 5 : 4;
+            view.innerHTML = `Active Trade: <b>${spotHolding.coin}</b> | Entry: $${spotHolding.buyPrice.toFixed(dec)} | PnL: <b style="color:${pnl>=0?'var(--accent-green)':'var(--accent-red)'}">$${pnl.toFixed(2)}</b>`;
+            btn.style.display = "block";
+        } else {
+            view.innerText = "No active positions running across platform.";
+            btn.style.display = "none";
+        }
+    }
+
+    function adminForceCloseTrade() {
+        if(spotHolding) {
+            let priceDiff = currentMarketPrice - spotHolding.buyPrice;
+            let pnl = (priceDiff / spotHolding.buyPrice) * spotHolding.cost;
+            closePosition('ADMIN_FORCE_CLOSE', pnl);
+            showToast("Trade Force-Closed by Admin!", "error");
+        }
+    }
+
+    function populateCoinList(coins) {
+        let dropdown = document.getElementById("coinDropdown");
+        dropdown.innerHTML = "";
+        coins.forEach(coin => {
+            let item = document.createElement("div");
+            item.innerText = coin;
+            item.onclick = function() { selectCoin(coin); };
+            dropdown.appendChild(item);
+        });
+    }
+
+    function selectCoin(coin) {
+        selectedCoin = coin;
+        document.getElementById("coinSearchInput").value = coin;
+        document.getElementById("coinDropdown").style.display = "none";
+        renderTradingViewChart(coin);
+        fetchOKXRealPrice();
+        showToast(`Loaded ${selectedCoin}`, "success");
+        savePersistentState();
+    }
+
+    function showCoins() { document.getElementById("coinDropdown").style.display = "block"; }
+    function filterCoins() {
+        let query = document.getElementById("coinSearchInput").value.toUpperCase();
+        let filtered = okxSpotCoins.filter(c => c.includes(query));
+        populateCoinList(filtered);
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = "flex"; }
+    function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+
+    function submitDeposit() {
+        let amt = document.getElementById("depAmount").value;
+        let txid = document.getElementById("depTxid").value;
+        let net = document.getElementById("depNetwork").value;
+
+        if(!amt || !txid) { showToast("Fill all deposit details!", "error"); return; }
+
+        adminRequests.push({ id: Date.now(), type: 'DEPOSIT', amount: parseFloat(amt), details: `${net} | ${txid.substring(0,8)}...` });
+        renderAdminTable();
+        closeModals();
+        showToast("Deposit Request Sent to Admin!", "success");
+    }
+
+    function submitWithdraw() {
+        let amt = document.getElementById("withAmount").value;
+        let addr = document.getElementById("withAddress").value;
+
+        if(!amt || !addr) { showToast("Fill all withdraw details!", "error"); return; }
+
+        adminRequests.push({ id: Date.now(), type: 'WITHDRAW', amount: parseFloat(amt), details: addr.substring(0,8) + '...' });
+        renderAdminTable();
+        closeModals();
+        showToast("Withdraw Request Sent to Admin!", "success");
+    }
+
+    function renderAdminTable() {
+        let tbody = document.getElementById("adminRequestsTable");
+        if(adminRequests.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No pending requests</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = "";
+        adminRequests.forEach(req => {
+            let row = `<tr>
+                <td style="color:${req.type === 'DEPOSIT' ? '#0ecb81' : '#f0b90b'}"><b>${req.type}</b></td>
+                <td>$${req.amount}</td>
+                <td><small>${req.details}</small></td>
+                <td>
+                    <button class="btn-claim" onclick="approveReq(${req.id})">Approve</button>
+                    <button class="btn-close-pos" onclick="rejectReq(${req.id})">Reject</button>
+                </td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function approveReq(id) {
+        let req = adminRequests.find(r => r.id === id);
+        if(req) {
+            if(req.type === 'DEPOSIT') totalWalletBalance += req.amount;
+            else totalWalletBalance -= req.amount;
+
+            document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
+            showToast(`${req.type} Request Approved!`, "success");
+            savePersistentState();
+        }
+        adminRequests = adminRequests.filter(r => r.id !== id);
+        renderAdminTable();
+    }
+
+    function rejectReq(id) {
+        adminRequests = adminRequests.filter(r => r.id !== id);
+        renderAdminTable();
+        showToast("Request Rejected", "error");
+    }
+
+    function claimSessionProfit() {
+        if (sessionProfit <= 0) {
+            showToast("No profit to claim!", "error");
+            return;
+        }
+        totalWalletBalance += sessionProfit;
+        document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
+        showToast(`Claimed $${sessionProfit.toFixed(2)} to Wallet!`, "success");
+        sessionProfit = 0;
+        document.getElementById("dispSessionProfit").innerText = "$0.00";
+        savePersistentState();
+    }
+
+    function renderSingleLog(log) {
+        let container = document.getElementById("tradeLogs");
+        if(container.innerHTML.includes("Select coin")) container.innerHTML = "";
+
+        let typeColor = log.pnl >= 0 ? '#0ecb81' : '#f6465d';
+
+        let row = `<tr>
+            <td><b>${log.coin}</b></td>
+            <td style="color:${typeColor}">${log.pnl >= 0 ? '+' : ''}$${log.pnl.toFixed(2)}</td>
+            <td><b>$${log.botBal.toFixed(2)}</b></td>
+        </tr>`;
+
+        container.insertAdjacentHTML('afterbegin', row);
+        savePersistentState();
+    }
+
+    function showToast(msg, type = 'info') {
+        let container = document.getElementById("toastContainer");
+        let toast = document.createElement("div");
+        toast.className = `toast ${type}`;
+        toast.innerText = msg;
+        container.appendChild(toast);
+        setTimeout(() => { toast.remove(); }, 3000);
+    }
+
+    function logConsole(msg) {
+        let terminal = document.getElementById("sysTerminal");
+        terminal.innerHTML += `${msg}<br>`;
+        terminal.scrollTop = terminal.scrollHeight;
+        savePersistentState();
+    }
+</script>
+
 </body>
 </html>
