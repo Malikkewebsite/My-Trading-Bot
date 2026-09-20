@@ -28,6 +28,8 @@ let isAdminLoggedIn = false;
 let activeAccessCodeObj = null;
 let databaseCodes = [];
 
+// ==================== SUPABASE & SERVER API FUNCTIONS ====================
+
 async function fetchCodesFromServer() {
     try {
         let res = await fetch(`${API_BASE}/api/codes`);
@@ -37,7 +39,7 @@ async function fetchCodesFromServer() {
             renderAdminCodesListFromDB();
         }
     } catch(e) {
-        console.error("Error fetching codes", e);
+        console.error("Error fetching codes from Supabase", e);
     }
 }
 
@@ -127,6 +129,111 @@ async function verifyAndUnlockCode() {
         showToast("Server connection error during code verification!", "error");
     }
 }
+
+async function fetchAdminTransactions() {
+    try {
+        let res = await fetch(`${API_BASE}/api/transactions`);
+        let json = await res.json();
+        if(json.status === 'success') {
+            adminRequests = json.data.filter(t => t.status === 'pending');
+            renderAdminTable();
+        }
+    } catch(e) {}
+}
+
+async function submitDeposit() {
+    let amt = document.getElementById("depAmount").value;
+    let txid = document.getElementById("depTxid").value;
+    let net = document.getElementById("depNetwork").value;
+
+    if(!amt || !txid) { showToast("Fill all deposit details!", "error"); return; }
+
+    let txData = {
+        user_id: "UID-781988",
+        type: "DEPOSIT",
+        amount: parseFloat(amt),
+        status: "pending",
+        details: `${net} | ${txid}`
+    };
+
+    try {
+        let res = await fetch(`${API_BASE}/api/transactions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(txData)
+        });
+        if(res.ok) {
+            closeModals();
+            showToast("Deposit Request Sent & Saved to Supabase!", "success");
+            fetchAdminTransactions();
+        } else {
+            showToast("Error submitting deposit request", "error");
+        }
+    } catch(e) {
+        showToast("Server connection error during deposit", "error");
+    }
+}
+
+async function submitWithdraw() {
+    let amt = document.getElementById("withAmount").value;
+    let addr = document.getElementById("withAddress").value;
+
+    if(!amt || !addr) { showToast("Fill all withdraw details!", "error"); return; }
+
+    let txData = {
+        user_id: "UID-781988",
+        type: "WITHDRAW",
+        amount: parseFloat(amt),
+        status: "pending",
+        details: addr
+    };
+
+    try {
+        let res = await fetch(`${API_BASE}/api/transactions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(txData)
+        });
+        if(res.ok) {
+            closeModals();
+            showToast("Withdraw Request Sent & Saved to Supabase!", "success");
+            fetchAdminTransactions();
+        } else {
+            showToast("Error submitting withdraw request", "error");
+        }
+    } catch(e) {
+        showToast("Server connection error during withdraw", "error");
+    }
+}
+
+async function updateTxStatus(id, newStatus, amount, type) {
+    try {
+        let res = await fetch(`${API_BASE}/api/transactions/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+
+        if(res.ok) {
+            if(newStatus === 'approved') {
+                if(type === 'DEPOSIT') totalWalletBalance += amount;
+                else totalWalletBalance -= amount;
+
+                document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
+                savePersistentState();
+                showToast("Request Approved & Wallet Updated!", "success");
+            } else {
+                showToast("Request Rejected", "error");
+            }
+            fetchAdminTransactions();
+        }
+    } catch(e) {
+        showToast("Error updating request status", "error");
+    }
+}
+
+// ==================== DASHBOARD & BOT LOGIC ====================
 
 function checkActiveAccessValidity() {
     let savedAccess = localStorage.getItem("bot_active_access");
@@ -598,82 +705,6 @@ function filterCoins() {
 function openModal(id) { document.getElementById(id).style.display = "flex"; }
 function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
 
-async function submitDeposit() {
-    let amt = document.getElementById("depAmount").value;
-    let txid = document.getElementById("depTxid").value;
-    let net = document.getElementById("depNetwork").value;
-
-    if(!amt || !txid) { showToast("Fill all deposit details!", "error"); return; }
-
-    let txData = {
-        user_id: "UID-781988",
-        type: "DEPOSIT",
-        amount: parseFloat(amt),
-        status: "pending",
-        details: `${net} | ${txid}`
-    };
-
-    try {
-        let res = await fetch(`${API_BASE}/api/transactions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(txData)
-        });
-        if(res.ok) {
-            closeModals();
-            showToast("Deposit Request Sent & Saved to Supabase!", "success");
-            fetchAdminTransactions();
-        } else {
-            showToast("Error submitting deposit request", "error");
-        }
-    } catch(e) {
-        showToast("Server connection error during deposit", "error");
-    }
-}
-
-async function submitWithdraw() {
-    let amt = document.getElementById("withAmount").value;
-    let addr = document.getElementById("withAddress").value;
-
-    if(!amt || !addr) { showToast("Fill all withdraw details!", "error"); return; }
-
-    let txData = {
-        user_id: "UID-781988",
-        type: "WITHDRAW",
-        amount: parseFloat(amt),
-        status: "pending",
-        details: addr
-    };
-
-    try {
-        let res = await fetch(`${API_BASE}/api/transactions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(txData)
-        });
-        if(res.ok) {
-            closeModals();
-            showToast("Withdraw Request Sent & Saved to Supabase!", "success");
-            fetchAdminTransactions();
-        } else {
-            showToast("Error submitting withdraw request", "error");
-        }
-    } catch(e) {
-        showToast("Server connection error during withdraw", "error");
-    }
-}
-
-async function fetchAdminTransactions() {
-    try {
-        let res = await fetch(`${API_BASE}/api/transactions`);
-        let json = await res.json();
-        if(json.status === 'success') {
-            adminRequests = json.data.filter(t => t.status === 'pending');
-            renderAdminTable();
-        }
-    } catch(e) {}
-}
-
 function renderAdminTable() {
     let tbody = document.getElementById("adminRequestsTable");
     if(!tbody) return;
@@ -696,33 +727,6 @@ function renderAdminTable() {
         </tr>`;
         tbody.innerHTML += row;
     });
-}
-
-async function updateTxStatus(id, newStatus, amount, type) {
-    try {
-        let res = await fetch(`${API_BASE}/api/transactions/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus })
-        });
-
-        if(res.ok) {
-            if(newStatus === 'approved') {
-                if(type === 'DEPOSIT') totalWalletBalance += amount;
-                else totalWalletBalance -= amount;
-
-                document.getElementById("headerBalance").innerText = `$${totalWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-                document.getElementById("adminUserBalDisp").innerText = totalWalletBalance.toFixed(2);
-                savePersistentState();
-                showToast("Request Approved & Wallet Updated!", "success");
-            } else {
-                showToast("Request Rejected", "error");
-            }
-            fetchAdminTransactions();
-        }
-    } catch(e) {
-        showToast("Error updating request status", "error");
-    }
 }
 
 function claimSessionProfit() {
