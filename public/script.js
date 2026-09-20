@@ -1,5 +1,5 @@
 const adminWhatsAppNumber = "923000000000"; 
-const API_BASE = "http://localhost:5000"; // Agar live server par ho toh apna domain/backend URL lagayein
+const API_BASE = ""; // Vercel par same domain use karne ke liye isay khaali chhor dein
 
 let okxSpotCoins = [
     "MOODENG-USDT", "XRP-USDT", "SOL-USDT", "BTC-USDT", "ETH-USDT", "DOGE-USDT", 
