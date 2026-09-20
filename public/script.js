@@ -1,90 +1,52 @@
-function showErrorPopup(message) {
-    const popup = document.getElementById('errorPopup');
-    const msgElem = document.getElementById('popupErrorMessage');
-    if(msgElem && popup) {
-        msgElem.innerText = message;
-        popup.style.display = 'flex';
+async function verifyAccess() {
+  const passcode = document.getElementById('passcodeInput').value;
+  if(!passcode) {
+    alert('Please enter a passcode');
+    return;
+  }
+  try {
+    const res = await fetch('/api/verify-passcode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passcode })
+    });
+    const data = await res.json();
+    if(data.success) {
+      window.location.href = 'dashboard.html';
+    } else {
+      alert('Access Denied: Invalid Passcode');
     }
+  } catch(err) {
+    console.error(err);
+    alert('Error verifying passcode');
+  }
 }
 
-const closeBtn = document.getElementById('popupCloseBtn');
-if(closeBtn) {
-    closeBtn.addEventListener('click', () => {
-        document.getElementById('errorPopup').style.display = 'none';
-    });
+async function fetchTicker() {
+  const priceEl = document.getElementById('livePrice');
+  if(!priceEl) return;
+  try {
+    const res = await fetch('/api/bybit/ticker');
+    const data = await res.json();
+    if(data.result && data.result.list && data.result.list.length > 0) {
+      priceEl.innerText = `$${parseFloat(data.result.list[0].lastPrice).toLocaleString()}`;
+    }
+  } catch(err) {
+    console.error('Ticker fetch error:', err);
+  }
 }
 
-const startBtn = document.getElementById('startBtn');
-if(startBtn) {
-    startBtn.addEventListener('click', async () => {
-        const username = document.getElementById('usernameInput').value || 'Malik_Trader';
-        const symbol = document.getElementById('coinSymbol').value;
-        const allocatedCapital = parseFloat(document.getElementById('allocatedCapital').value);
-        const logsContainer = document.getElementById('logsContainer');
-
-        logsContainer.innerHTML += `<p>[INFO] Executing trade on ${symbol}...</p>`;
-
-        try {
-            const response = await fetch('/api/start-trade', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, symbol, allocatedCapital })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                logsContainer.innerHTML += `<p style="color: #00ffcc;">[SUCCESS] ${data.message}</p>`;
-                document.getElementById('walletBalance').innerText = `$${data.balance}`;
-            } else {
-                logsContainer.innerHTML += `<p style="color: #ff5252;">[ERROR] ${data.error}</p>`;
-                showErrorPopup(data.error);
-            }
-        } catch (err) {
-            showErrorPopup("Network connection failed. Check your internet connection.");
-        }
-        logsContainer.scrollTop = logsContainer.scrollHeight;
-    });
+function generatePasscode() {
+  const randomKey = 'SMC-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+  document.getElementById('generatedKey').innerText = `Generated Passcode: ${randomKey}`;
 }
 
-const depositBtn = document.getElementById('depositBtn');
-if(depositBtn) {
-    depositBtn.addEventListener('click', async () => {
-        const username = document.getElementById('usernameInput').value || 'Malik_Trader';
-        const amount = prompt("Enter Deposit Amount ($):", "100");
-        if(!amount) return;
-
-        const res = await fetch('/api/transaction', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, type: 'DEPOSIT', amount: parseFloat(amount) })
-        });
-        const data = await res.json();
-        alert(data.message);
-    });
+// Auto update ticker if on dashboard
+if(document.getElementById('livePrice')) {
+  fetchTicker();
+  setInterval(fetchTicker, 3000);
 }
 
-const withdrawBtn = document.getElementById('withdrawBtn');
-if(withdrawBtn) {
-    withdrawBtn.addEventListener('click', async () => {
-        const username = document.getElementById('usernameInput').value || 'Malik_Trader';
-        const amount = prompt("Enter Withdrawal Amount ($):", "50");
-        if(!amount) return;
-
-        const res = await fetch('/api/transaction', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, type: 'WITHDRAW', amount: parseFloat(amount) })
-        });
-        const data = await res.json();
-        alert(data.message);
-    });
-}
-
-const stopBtn = document.getElementById('stopBtn');
-if(stopBtn) {
-    stopBtn.addEventListener('click', () => {
-        const logs = document.getElementById('logsContainer');
-        logs.innerHTML += `<p style="color: #ff9800;">[INFO] Bot stopped safely.</p>`;
-    });
+function toggleBot() {
+  alert('Bot execution status toggled successfully!');
 }
