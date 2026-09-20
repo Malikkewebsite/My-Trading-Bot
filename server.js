@@ -7,9 +7,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+// Serve static frontend files from the 'public' folder
+app.use(express.static(path.join(__dirname, 'public')));
 
-// In-memory fallback database for serverless root deployment resilience
+// In-memory fallback database
 let dbCodes = [
     { id: '1', code: 'BYBIT-VIP-9921', tier: 'VIP Unlimited', used: false },
     { id: '2', code: 'BYBIT-PRO-4412', tier: 'Pro Trader', used: false }
@@ -19,14 +20,11 @@ let dbTransactions = [
     { id: 'tx-101', type: 'deposit', amount: 100, details: '7f8c9b4e12a1b2', status: 'pending' }
 ];
 
-// Bybit API Configuration using keys from user profile
 const BYBIT_API_KEY = process.env.BYBIT_API_KEY || 'eZKaZBv02FE2NX5Jd';
 const BYBIT_API_SECRET = process.env.BYBIT_API_SECRET || 'TGvJJ6E833VwImpP8Ed5l6Y4E1owjlpvw';
 
-// API Endpoints
-app.get('/api/codes', (req, res) => {
-    res.json(dbCodes);
-});
+// API Routes
+app.get('/api/codes', (req, res) => res.json(dbCodes));
 
 app.post('/api/codes', (req, res) => {
     const { tier } = req.body;
@@ -39,19 +37,13 @@ app.post('/api/codes', (req, res) => {
 app.post('/api/codes/use', (req, res) => {
     const { code } = req.body;
     const found = dbCodes.find(c => c.code === code);
-    if (!found) {
-        return res.status(400).json({ error: 'Invalid passcode' });
-    }
-    if (found.used) {
-        return res.status(400).json({ error: 'Passcode already redeemed' });
-    }
+    if (!found) return res.status(400).json({ error: 'Invalid passcode' });
+    if (found.used) return res.status(400).json({ error: 'Passcode already redeemed' });
     found.used = true;
     res.json({ success: true, tier: found.tier });
 });
 
-app.get('/api/transactions', (req, res) => {
-    res.json(dbTransactions);
-});
+app.get('/api/transactions', (req, res) => res.json(dbTransactions));
 
 app.post('/api/transactions', (req, res) => {
     const { type, amount, details } = req.body;
@@ -61,7 +53,6 @@ app.post('/api/transactions', (req, res) => {
 });
 
 app.patch('/api/transactions/:id', (req, res) => {
-    const { id } = req.body;
     const tx = dbTransactions.find(t => t.id === req.params.id);
     if (tx) {
         tx.status = 'approved';
@@ -70,17 +61,13 @@ app.patch('/api/transactions/:id', (req, res) => {
     res.status(404).json({ error: 'Transaction not found' });
 });
 
-// Live Bybit Bot Engine Route
 app.post('/api/bot/start', (req, res) => {
     const { symbol, strategy, capital } = req.body;
-    // Real signature generation simulation for Bybit REST API V5
     const timestamp = Date.now().toString();
     const recvWindow = '5000';
     const rawString = timestamp + BYBIT_API_KEY + recvWindow + `symbol=${symbol}&side=Buy&orderType=Market&qty=${capital}`;
     const signature = crypto.createHmac('sha256', BYBIT_API_SECRET).update(rawString).digest('hex');
 
-    console.log(`[BYBIT API REQUEST] Symbol: ${symbol}, Strategy: ${strategy}, Signature generated.`);
-    
     res.json({
         success: true,
         message: `Successfully authenticated with Bybit V5 REST API. Bot active for ${symbol}.`,
@@ -88,10 +75,11 @@ app.post('/api/bot/start', (req, res) => {
     });
 });
 
+// Fallback to index.html for single-page application routing
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
-    console.log(`Bybit Automated Trading Bot server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
