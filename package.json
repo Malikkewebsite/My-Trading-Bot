@@ -1,7 +1,7 @@
 {
-  "name": "bybit-automated-trading-bot",
+  "name": "my-trading-bot",
   "version": "1.0.0",
-  "description": "Production-ready Bybit automated spot and futures trading bot platform",
+  "description": "Bybit Automated Trading Bot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
