@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Malik Trading Bot - 7 Day Access</title>
+    <title>Malik Trading Bot - Home</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="landing-body">
     <div class="container landing-container">
         <header class="landing-header">
             <h1>MALIK TRADING BOT</h1>
-            <p class="tagline">Automated Spot Trading with Bybit API & Supabase</p>
+            <p class="tagline">Advanced Automated Spot Trading & SMC Setup Engine</p>
         </header>
 
         <div class="pricing-card">
@@ -18,26 +18,24 @@
             <h2>7-Day Access Pass</h2>
             <div class="price">$19.99 <span>/ 7 days</span></div>
             <ul class="features-list">
-                <li>✓ Full Bybit API Integration</li>
+                <li>✓ Full Bybit API Live Integration</li>
                 <li>✓ Real-time SMC & Price Action Signals</li>
-                <li>✓ Secure Supabase Database Sync</li>
-                <li>✓ 24/7 Automated Execution</li>
+                <li>✓ Secure Supabase PostgreSQL Database Sync</li>
+                <li>✓ 24/7 Automated Execution & Risk Management</li>
             </ul>
             <button id="buyAccessBtn" class="btn-start" style="margin-top: 20px;">Get 7-Day Access Now</button>
         </div>
 
         <div class="direct-link" style="margin-top: 20px; text-align: center;">
-            <a href="dashboard.html" class="btn-back">Already have access? Go to Dashboard →</a>
+            <a href="dashboard.html" class="btn-back">Already have access? Go to Trading Dashboard →</a>
         </div>
     </div>
 
     <script>
         document.getElementById('buyAccessBtn').addEventListener('click', () => {
-            const username = prompt("Enter your username/email to activate 7-day access:", "Malik_Trader");
+            const username = prompt("Enter your username to activate 7-day access:", "Malik_Trader");
             if (!username) return;
-
-            // Redirect to dashboard after purchase simulation
-            alert("Access activated successfully! Redirecting to trading dashboard...");
+            alert("Access activated successfully! Redirecting to dashboard...");
             window.location.href = `dashboard.html?user=${encodeURIComponent(username)}`;
         });
     </script>
