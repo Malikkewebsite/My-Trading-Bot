@@ -1,43 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Malik Trading Bot - Home</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bybit SMC Bot - Access Portal</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body class="landing-body">
-    <div class="container landing-container">
-        <header class="landing-header">
-            <h1>MALIK TRADING BOT</h1>
-            <p class="tagline">Advanced Automated Spot Trading & SMC Setup Engine</p>
-        </header>
+<body>
+  <header>
+    <div class="logo">⚡ SMC & FVG Bot Terminal</div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="admin.html">Admin</a>
+    </div>
+  </header>
 
-        <div class="pricing-card">
-            <div class="badge">Special Offer</div>
-            <h2>7-Day Access Pass</h2>
-            <div class="price">$19.99 <span>/ 7 days</span></div>
-            <ul class="features-list">
-                <li>✓ Full Bybit API Live Integration</li>
-                <li>✓ Real-time SMC & Price Action Signals</li>
-                <li>✓ Secure Supabase PostgreSQL Database Sync</li>
-                <li>✓ 24/7 Automated Execution & Risk Management</li>
-            </ul>
-            <button id="buyAccessBtn" class="btn-start" style="margin-top: 20px;">Get 7-Day Access Now</button>
-        </div>
-
-        <div class="direct-link" style="margin-top: 20px; text-align: center;">
-            <a href="dashboard.html" class="btn-back">Already have access? Go to Trading Dashboard →</a>
-        </div>
+  <div class="container">
+    <div class="card" style="text-align: center; padding: 50px 20px;">
+      <h1 style="font-size: 36px; margin-bottom: 15px;">Automated Smart Money Crypto Bot</h1>
+      <p style="color: var(--text-muted); margin-bottom: 30px;">Trade with institutional precision using SMC, FVG logic, Auto Break-Even & Risk Management connected live with Bybit API.</p>
+      
+      <div style="margin-bottom: 25px;">
+        <input type="text" id="passcodeInput" placeholder="Enter Access Passcode" style="padding: 12px; width: 300px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--bg-color); color: white; margin-right: 10px;">
+        <button class="btn" onclick="verifyAccess()">Access Dashboard</button>
+      </div>
     </div>
 
-    <script>
-        document.getElementById('buyAccessBtn').addEventListener('click', () => {
-            const username = prompt("Enter your username to activate 7-day access:", "Malik_Trader");
-            if (!username) return;
-            alert("Access activated successfully! Redirecting to dashboard...");
-            window.location.href = `dashboard.html?user=${encodeURIComponent(username)}`;
-        });
-    </script>
+    <div class="grid-2">
+      <div class="card">
+        <h2>Standard Plan</h2>
+        <p style="color: var(--text-muted); margin: 15px 0;">Perfect for manual and semi-automated scalpers.</p>
+        <h3 style="color: var(--accent-green); font-size: 28px; margin-bottom: 15px;">$49 / mo</h3>
+        <button class="btn" onclick="location.href='dashboard.html'">Get Started</button>
+      </div>
+      <div class="card" style="border-color: var(--primary-blue);">
+        <h2>VIP Automated Bot</h2>
+        <p style="color: var(--text-muted); margin: 15px 0;">Full algorithmic SMC + FVG auto-execution bot.</p>
+        <h3 style="color: var(--accent-green); font-size: 28px; margin-bottom: 15px;">$99 / mo</h3>
+        <button class="btn" onclick="location.href='dashboard.html'">Get VIP Access</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
