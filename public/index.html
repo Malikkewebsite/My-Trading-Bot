@@ -3,258 +3,239 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bybit Automated Spot & Futures Trading Terminal</title>
+    <title>BYBIT BOT PRO - Advanced Automated Trading</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div class="brand">
-                <i class="fa-solid fa-bolt-lightning text-accent"></i>
-                <span>BYBIT BOT PRO</span>
+            <div class="logo-area">
+                <h2>⚡ BYBIT BOT PRO</h2>
+                <span id="user-uid-badge" class="uid-tag">UID: Loading...</span>
             </div>
-            <nav class="nav-menu">
-                <a href="#" class="nav-item active" data-target="dashboard-view"><i class="fa-solid fa-chart-line"></i> Trading Bot</a>
-                <a href="#" class="nav-item" data-target="funds-view"><i class="fa-solid fa-wallet"></i> Fund Management</a>
-                <a href="#" class="nav-item" data-target="pricing-view"><i class="fa-solid fa-crown"></i> Pricing & Access</a>
-                <a href="#" class="nav-item" data-target="admin-view"><i class="fa-solid fa-shield-halved"></i> Admin Panel</a>
-            </nav>
-            <div class="sidebar-footer">
-                <div class="connection-status">
-                    <span class="status-dot online"></span>
-                    <span id="api-status-text">Bybit API Connected</span>
-                </div>
-            </div>
+            <ul class="nav-links">
+                <li class="active" onclick="switchTab('trading')">📊 Trading Bot</li>
+                <li onclick="switchTab('funds')">💰 Fund Management</li>
+                <li onclick="switchTab('pricing')">👑 Pricing & Access</li>
+                <li onclick="switchTab('admin')">🛡️ Admin Panel</li>
+            </ul>
         </aside>
 
         <!-- Main Content Area -->
         <main class="main-content">
             <!-- Top Header Bar -->
-            <header class="topbar">
-                <div class="header-search">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="global-search" placeholder="Search pairs (e.g. BTCUSDT, ETHUSDT)...">
+            <header class="top-bar">
+                <div class="search-box-wrapper">
+                    <input type="text" id="coin-search" placeholder="Search Bybit coins (e.g. BTCUSDT, ETHUSDT)..." onkeyup="filterCoins()">
+                    <div id="coin-dropdown" class="coin-dropdown hidden"></div>
                 </div>
-                <div class="header-user">
-                    <div class="passcode-badge" id="active-tier-badge">
-                        <i class="fa-solid fa-lock-open"></i> <span id="current-plan-name">Starter Plan</span>
-                    </div>
-                    <button class="btn btn-outline" id="open-passcode-modal">Enter Passcode</button>
-                    <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
+                <div class="user-quick-info">
+                    <span id="header-balance" class="balance-display">Balance: $0.00</span>
+                    <span id="plan-status-badge" class="plan-badge locked">🔒 Plan Locked</span>
+                    <input type="password" id="passcode-input" placeholder="Enter Passcode">
+                    <button onclick="redeemPasscode()" class="btn-sm">Unlock</button>
                 </div>
             </header>
 
-            <!-- VIEW 1: TRADING BOT DASHBOARD -->
-            <section id="dashboard-view" class="view-section active">
-                <div class="dashboard-grid">
-                    <!-- Left: Chart & Market Feed -->
-                    <div class="market-section card">
-                        <div class="card-header">
-                            <div class="pair-selector">
-                                <select id="trading-pair-select">
-                                    <option value="BTCUSDT">BTC/USDT</option>
-                                    <option value="ETHUSDT">ETH/USDT</option>
-                                    <option value="SOLUSDT" selected>SOL/USDT</option>
-                                    <option value="MOODENGUSDT">MOODENG/USDT</option>
-                                </select>
-                            </div>
-                            <div class="market-stats">
-                                <div class="stat-item"><span>Price:</span> <strong id="live-price" class="text-accent">$142.50</strong></div>
-                                <div class="stat-item"><span>24h Change:</span> <strong id="live-change" class="text-green">+4.82%</strong></div>
-                            </div>
+            <!-- TAB 1: TRADING BOT -->
+            <section id="tab-trading" class="tab-section active">
+                <div class="trading-grid">
+                    <div class="chart-panel">
+                        <div class="coin-header-info">
+                            <h3 id="selected-coin-title">BTC/USDT</h3>
+                            <span id="coin-price" class="price-tag">$--.--</span>
+                            <span id="coin-change" class="change-tag">+0.00%</span>
                         </div>
-                        <div class="chart-container">
-                            <div class="mock-tradingview-chart">
-                                <div class="chart-overlay-grid"></div>
-                                <div class="chart-line-sim"></div>
-                                <div class="chart-watermark">BYBIT SPOT & FUTURES ENGINE</div>
-                            </div>
+                        <div class="mock-chart-box">
+                            <canvas id="priceCanvas" width="400" height="200"></canvas>
                         </div>
                     </div>
 
-                    <!-- Right: Bot Controls & Risk Engine -->
-                    <div class="bot-control-section card">
-                        <div class="card-header">
-                            <h3><i class="fa-solid fa-sliders"></i> Smart Algo Config</h3>
-                            <span class="badge badge-green">Bybit API Active</span>
+                    <div class="config-panel">
+                        <h3>🤖 Smart Algo Config</h3>
+                        <div class="form-group">
+                            <label>Strategy Mode</label>
+                            <select id="strategy-select">
+                                <option>Smart Money Concepts (SMC + FVG)</option>
+                                <option>50/200 EMA Crossover Scalper</option>
+                                <option>Dynamic Grid Arbitrage</option>
+                            </select>
                         </div>
-                        <div class="control-form">
-                            <div class="form-group">
-                                <label>Strategy Mode</label>
-                                <select id="bot-strategy">
-                                    <option value="smc">Smart Money Concepts (SMC + FVG)</option>
-                                    <option value="ema">50/200 EMA Crossover Scalper</option>
-                                    <option value="grid">Dynamic Grid Arbitrage</option>
-                                </select>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Capital Allocation ($ USDT)</label>
-                                    <input type="number" id="bot-capital" value="500">
-                                </div>
-                                <div class="form-group">
-                                    <label>Risk Per Trade (%)</label>
-                                    <input type="number" id="bot-risk" value="2.0" step="0.1">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Risk-to-Reward (RR)</label>
-                                <select id="bot-rr">
-                                    <option value="1.5">Auto Break-Even at 1:1.5 RR</option>
-                                    <option value="2.0">1:2.0 Target Matrix</option>
-                                    <option value="3.0">1:3.0 Aggressive Swing</option>
-                                </select>
-                            </div>
-                            <div class="bot-action-buttons">
-                                <button id="start-bot-btn" class="btn btn-success btn-full"><i class="fa-solid fa-play"></i> Start Live Bot</button>
-                                <button id="stop-bot-btn" class="btn btn-danger btn-full" disabled><i class="fa-solid fa-stop"></i> Stop Bot</button>
-                            </div>
+                        <div class="form-group">
+                            <label>Capital Allocation ($ USDT)</label>
+                            <input type="number" id="capital-input" value="500">
                         </div>
-                        <div class="session-metrics">
-                            <div class="metric-box">
-                                <span>Session PnL</span>
-                                <h4 id="session-pnl" class="text-green">+$0.00</h4>
-                            </div>
-                            <div class="metric-box">
-                                <span>Active Trades</span>
-                                <h4 id="active-trades-count">0</h4>
-                            </div>
+                        <div class="form-group">
+                            <label>Risk Per Trade (%)</label>
+                            <input type="number" id="risk-input" value="2.0">
+                        </div>
+                        <div class="action-buttons">
+                            <button onclick="startBot()" class="btn-success">▶ Start Live Bot</button>
+                            <button onclick="stopBot()" class="btn-danger">⏹ Stop Bot</button>
+                        </div>
+                        <div class="session-stats">
+                            <div>Session PnL: <span id="session-pnl" class="pnl-pos">+$0.00</span></div>
+                            <div>Active Trades: <span id="active-trades-count">0</span></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Bottom Terminal Logs -->
-                <div class="terminal-card card">
-                    <div class="card-header">
-                        <h4><i class="fa-solid fa-terminal"></i> Execution Terminal & Signal Logs</h4>
-                        <button class="btn btn-sm btn-outline" id="clear-logs">Clear Logs</button>
+                <div class="terminal-box">
+                    <div class="terminal-header">
+                        <span>Execution Terminal & Signal Logs</span>
+                        <button onclick="clearLogs()" class="btn-clear">Clear Logs</button>
                     </div>
-                    <div class="terminal-body" id="terminal-logs">
-                        <div class="log-line">[SYSTEM] Initialized Bybit API securely. Ready for live order placement.</div>
+                    <div id="terminal-logs" class="terminal-body">
+                        [SYSTEM] Initialized Bybit API securely. Ready for live order placement.
                     </div>
                 </div>
             </section>
 
-            <!-- VIEW 2: FUND MANAGEMENT -->
-            <section id="funds-view" class="view-section">
+            <!-- TAB 2: FUND MANAGEMENT -->
+            <section id="tab-funds" class="tab-section hidden">
                 <div class="funds-grid">
-                    <div class="card">
-                        <div class="card-header"><h3><i class="fa-solid fa-arrow-down-to-bracket"></i> Deposit USDT (TRC20)</h3></div>
-                        <div class="deposit-box">
-                            <p>Send USDT via TRC20 network to the official platform pool wallet below:</p>
-                            <div class="wallet-address-box">
-                                <code id="platform-wallet">TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE</code>
-                                <button class="btn btn-sm btn-accent" id="copy-wallet">Copy</button>
-                            </div>
-                            <div class="form-group mt-3">
-                                <label>Enter Transaction Hash (TxID)</label>
-                                <input type="text" id="deposit-txid" placeholder="e.g. 7f8c9b...a1b2">
-                            </div>
-                            <div class="form-group">
-                                <label>Amount Deposited ($)</label>
-                                <input type="number" id="deposit-amount" placeholder="100">
-                            </div>
-                            <button class="btn btn-accent btn-full mt-2" id="submit-deposit">Submit Deposit Proof</button>
+                    <div class="card deposit-card">
+                        <h3>Deposit USDT / Easypaisa</h3>
+                        <p class="instruction-text">Send funds via TRC20 network or Easypaisa to the official platform wallet below:</p>
+                        <div class="wallet-box">
+                            <strong>USDT (TRC20):</strong> <span id="display-usdt-wallet">Loading...</span> <button onclick="copyWallet()" class="btn-xs">Copy</button>
                         </div>
+                        <div class="wallet-box" style="margin-top: 10px;">
+                            <strong>Easypaisa:</strong> <span id="display-easypaisa">Loading...</span> <button onclick="copyEasypaisa()" class="btn-xs">Copy</button>
+                        </div>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label>Payment Method</label>
+                            <select id="deposit-method">
+                                <option value="USDT">USDT (TRC20)</option>
+                                <option value="EASYPAISA">Easypaisa</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Enter Transaction Hash / Receipt ID</label>
+                            <input type="text" id="tx-hash-input" placeholder="e.g. 7f8c9b4e12a1b2...">
+                        </div>
+                        <div class="form-group">
+                            <label>Amount Deposited ($)</label>
+                            <input type="number" id="deposit-amount" placeholder="100">
+                        </div>
+                        <button onclick="submitDeposit()" class="btn-primary">Submit Deposit Proof</button>
                     </div>
 
-                    <div class="card">
-                        <div class="card-header"><h3><i class="fa-solid fa-arrow-up-from-bracket"></i> Request Withdrawal</h3></div>
-                        <div class="withdrawal-box">
-                            <div class="form-group">
-                                <label>Destination USDT Address</label>
-                                <input type="text" id="withdraw-address" placeholder="TRC20 wallet address">
-                            </div>
-                            <div class="form-group">
-                                <label>Amount to Withdraw ($)</label>
-                                <input type="number" id="withdraw-amount" placeholder="50">
-                            </div>
-                            <button class="btn btn-outline btn-full mt-2" id="submit-withdraw">Request Withdrawal</button>
+                    <div class="card withdraw-card">
+                        <h3>Request Withdrawal</h3>
+                        <div class="form-group">
+                            <label>Destination USDT Address / Easypaisa Account</label>
+                            <input type="text" id="withdraw-address" placeholder="TRC20 wallet address or Mobile Number">
                         </div>
+                        <div class="form-group">
+                            <label>Amount to Withdraw ($)</label>
+                            <input type="number" id="withdraw-amount" placeholder="50">
+                        </div>
+                        <button onclick="requestWithdrawal()" class="btn-warning">Request Withdrawal</button>
                     </div>
                 </div>
             </section>
 
-            <!-- VIEW 3: PRICING & TIERS -->
-            <section id="pricing-view" class="view-section">
+            <!-- TAB 3: PRICING & ACCESS -->
+            <section id="tab-pricing" class="tab-section hidden">
                 <div class="pricing-header">
                     <h2>Choose Your Trading Power</h2>
                     <p>Unlock advanced automated algorithms backed by real exchange connectivity.</p>
                 </div>
-                <div class="pricing-grid">
-                    <div class="pricing-card">
+                <div class="pricing-cards">
+                    <div class="price-card">
                         <h3>Starter Plan</h3>
-                        <div class="price"><span>$10</span>/7 days</div>
+                        <div class="price">$18<span>/7 days</span></div>
                         <ul>
-                            <li><i class="fa-solid fa-check"></i> 1 Active Trading Bot</li>
-                            <li><i class="fa-solid fa-check"></i> Standard SMC Indicators</li>
-                            <li><i class="fa-solid fa-check"></i> Telegram Signal Alerts</li>
+                            <li>✔ 1 Active Trading Bot</li>
+                            <li>✔ Standard SMC Indicators</li>
+                            <li>✔ Telegram Signal Alerts</li>
                         </ul>
-                        <button class="btn btn-outline btn-full" onclick="selectPlan('Starter Plan', 10)">Select Plan</button>
+                        <button onclick="selectPlan('Starter Plan')" class="btn-primary">Select Plan</button>
                     </div>
-                    <div class="pricing-card popular">
-                        <div class="ribbon">POPULAR</div>
+                    <div class="price-card popular">
+                        <div class="tag">POPULAR</div>
                         <h3>Pro Trader</h3>
-                        <div class="price"><span>$15</span>/14 days</div>
+                        <div class="price">$15<span>/14 days</span></div>
                         <ul>
-                            <li><i class="fa-solid fa-check"></i> 3 Concurrent Bots</li>
-                            <li><i class="fa-solid fa-check"></i> Advanced FVG & EMA 50/200</li>
-                            <li><i class="fa-solid fa-check"></i> Auto Break-Even (1:1.5 RR)</li>
+                            <li>✔ 3 Concurrent Bots</li>
+                            <li>✔ Advanced FVG & EMA 50/200</li>
+                            <li>✔ Auto Break-Even (1:1.5 RR)</li>
                         </ul>
-                        <button class="btn btn-accent btn-full" onclick="selectPlan('Pro Trader', 15)">Select Plan</button>
+                        <button onclick="selectPlan('Pro Trader')" class="btn-primary">Select Plan</button>
                     </div>
-                    <div class="pricing-card">
+                    <div class="price-card">
                         <h3>VIP Unlimited</h3>
-                        <div class="price"><span>$36</span>/30 days</div>
+                        <div class="price">$36<span>/30 days</span></div>
                         <ul>
-                            <li><i class="fa-solid fa-check"></i> Unlimited Automated Bots</li>
-                            <li><i class="fa-solid fa-check"></i> Custom API Key Binding</li>
-                            <li><i class="fa-solid fa-check"></i> 24/7 Priority Execution</li>
+                            <li>✔ Unlimited Automated Bots</li>
+                            <li>✔ Custom API Key Binding</li>
+                            <li>✔ 24/7 Priority Execution</li>
                         </ul>
-                        <button class="btn btn-outline btn-full" onclick="selectPlan('VIP Unlimited', 36)">Select Plan</button>
+                        <button onclick="selectPlan('VIP Unlimited')" class="btn-primary">Select Plan</button>
                     </div>
                 </div>
             </section>
 
-            <!-- VIEW 4: ADMIN DASHBOARD -->
-            <section id="admin-view" class="view-section">
-                <div id="admin-login-wrapper" class="card admin-auth-card">
-                    <h3><i class="fa-solid fa-lock"></i> Admin Portal Login</h3>
-                    <div class="form-group mt-3">
+            <!-- TAB 4: ADMIN PANEL -->
+            <section id="tab-admin" class="tab-section hidden">
+                <div id="admin-login-box" class="card admin-login-card">
+                    <h3>🛡️ Admin Portal Login</h3>
+                    <div class="form-group">
                         <label>Admin Secret Key</label>
-                        <input type="password" id="admin-password-input" placeholder="Enter admin password...">
+                        <input type="password" id="admin-key-input" placeholder="Enter admin password...">
                     </div>
-                    <button class="btn btn-accent btn-full mt-2" id="admin-login-btn">Access Admin Dashboard</button>
+                    <button onclick="adminLogin()" class="btn-primary">Access Admin Dashboard</button>
                 </div>
 
-                <div id="admin-dashboard-wrapper" class="hidden">
+                <div id="admin-dashboard" class="hidden">
                     <div class="admin-stats-grid">
-                        <div class="card stat-card"><span>Total Users</span><h3 id="admin-total-users">12</h3></div>
-                        <div class="card stat-card"><span>Pending Deposits</span><h3 id="admin-pending-deposits">3</h3></div>
-                        <div class="card stat-card"><span>Active Subscriptions</span><h3 id="admin-active-subs">8</h3></div>
+                        <div class="stat-box">
+                            <h4>Total Users</h4>
+                            <div id="admin-total-users" class="stat-num">0</div>
+                        </div>
+                        <div class="stat-box">
+                            <h4>Pending Deposits</h4>
+                            <div id="admin-pending-deposits" class="stat-num">0</div>
+                        </div>
+                        <div class="stat-box">
+                            <h4>Active Subscriptions</h4>
+                            <div id="admin-active-subs" class="stat-num">0</div>
+                        </div>
                     </div>
 
-                    <div class="card mt-3">
-                        <div class="card-header">
-                            <h4>Generate Access Passcode</h4>
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>⚙️ Edit Wallet & Payment Info</h3>
+                        <div class="form-group">
+                            <label>Official USDT (TRC20) Address</label>
+                            <input type="text" id="admin-edit-usdt">
                         </div>
-                        <div class="form-row">
-                            <input type="text" id="new-code-tier" placeholder="Tier Name (e.g. VIP)">
-                            <button class="btn btn-accent" id="generate-code-btn">Generate Passcode</button>
+                        <div class="form-group">
+                            <label>Official Easypaisa Account Details</label>
+                            <input type="text" id="admin-edit-easypaisa">
                         </div>
-                        <div class="mt-2"><strong id="generated-code-display"></strong></div>
+                        <button onclick="saveAdminSettings()" class="btn-success">Save Permanent Settings</button>
                     </div>
 
-                    <div class="card mt-3">
-                        <div class="card-header"><h4>Transaction Verification Ledger</h4></div>
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>🔑 Generate Access Passcode</h3>
+                        <div class="form-group">
+                            <label>Tier Name (e.g. Starter Plan, Pro Trader, VIP Unlimited)</label>
+                            <input type="text" id="passcode-tier-input" placeholder="Starter Plan">
+                        </div>
+                        <button onclick="generatePasscode()" class="btn-warning">Generate Passcode</button>
+                        <div id="generated-code-display" class="code-result"></div>
+                    </div>
+
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>📋 Transaction Verification Ledger</h3>
                         <div class="table-responsive">
-                            <table class="data-table">
+                            <table class="admin-table">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
+                                        <th>UID</th>
                                         <th>Type</th>
                                         <th>Amount</th>
                                         <th>TxID / Details</th>
@@ -262,8 +243,8 @@
                                         <th>Action</th>
                                     </tr>
                                 </thead>
-                                <tbody id="admin-transactions-table">
-                                    <tr><td colspan="6" class="text-center">Loading transactions...</td></tr>
+                                <tbody id="admin-tx-tbody">
+                                    <!-- Dynamic rows -->
                                 </tbody>
                             </table>
                         </div>
@@ -272,20 +253,6 @@
             </section>
         </main>
     </div>
-
-    <!-- Passcode Modal -->
-    <div class="modal-overlay" id="passcode-modal">
-        <div class="modal-card">
-            <h3>Enter Access Passcode</h3>
-            <p>Input your subscription passcode to activate bot trading terminals.</p>
-            <input type="text" id="passcode-input" class="mt-2" placeholder="BYBIT-XXXX-XXXX">
-            <div class="modal-actions mt-3">
-                <button class="btn btn-outline" id="close-passcode-modal">Cancel</button>
-                <button class="btn btn-accent" id="verify-passcode-btn">Verify Passcode</button>
-            </div>
-        </div>
-    </div>
-
     <script src="script.js"></script>
 </body>
 </html>
