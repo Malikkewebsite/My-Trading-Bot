@@ -61,13 +61,20 @@ app.post('/api/admin/generate', (req, res) => {
 // Gate.io Trade Route
 app.post('/api/gate/trade', async (req, res) => {
     try {
-        const { symbol, side, orderType, qty, price } = req.body;
+        const { symbol, side, orderType, qty, amount, capital, price } = req.body;
 
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
 
         if (!apiKey || !apiSecret) {
             return res.status(400).json({ success: false, error: 'Environment variables API keys are missing.' });
+        }
+
+        // Fallback check to capture qty, amount, or capital from frontend request
+        const rawQty = qty !== undefined && qty !== null && qty !== '' ? qty : (amount !== undefined && amount !== null && amount !== '' ? amount : capital);
+
+        if (!rawQty || isNaN(Number(rawQty))) {
+            return res.status(400).json({ success: false, error: 'Trading Error: Amount/Quantity must not be null or empty.' });
         }
 
         const host = 'api.gateio.ws';
@@ -84,11 +91,11 @@ app.post('/api/gate/trade', async (req, res) => {
             type: oType
         };
 
-        // Market Buy ke liye quote_amount use hota hai (USDT ki value), warna normal amount
+        // For Market Buy, use quote_amount (USDT value), otherwise use amount (coin quantity)
         if (oType === 'market' && sSide === 'buy') {
-            bodyObj.quote_amount = qty.toString();
+            bodyObj.quote_amount = Number(rawQty).toString();
         } else {
-            bodyObj.amount = qty.toString();
+            bodyObj.amount = Number(rawQty).toString();
         }
 
         if (oType !== 'market') {
