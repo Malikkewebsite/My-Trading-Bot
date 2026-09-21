@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BYBIT BOT PRO - Advanced Automated Trading</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CRYPTO BOT PRO - Advanced Automated Trading</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="logo-area">
-                <h2>⚡ BYBIT BOT PRO</h2>
+                <h2>⚡ CRYPTO BOT PRO</h2>
                 <span id="user-uid-badge" class="uid-tag">UID: Loading...</span>
             </div>
             <ul class="nav-links">
@@ -27,7 +27,7 @@
             <!-- Top Header Bar -->
             <header class="top-bar">
                 <div class="search-box-wrapper">
-                    <input type="text" id="coin-search" placeholder="Search Bybit coins (e.g. BTCUSDT, ETHUSDT)..." onkeyup="filterCoins()">
+                    <input type="text" id="coin-search" placeholder="Search coins (e.g. BTCUSDT, ETHUSDT)..." oninput="filterCoins()" onfocus="showCoinDropdown()">
                     <div id="coin-dropdown" class="coin-dropdown hidden"></div>
                 </div>
                 <div class="user-quick-info">
@@ -48,7 +48,7 @@
                             <span id="coin-change" class="change-tag">+0.00%</span>
                         </div>
                         <div class="mock-chart-box">
-                            <canvas id="priceCanvas" width="400" height="200"></canvas>
+                            <canvas id="priceCanvas"></canvas>
                         </div>
                     </div>
 
@@ -58,7 +58,7 @@
                             <label>Strategy Mode</label>
                             <select id="strategy-select">
                                 <option>Smart Money Concepts (SMC + FVG)</option>
-                                <option>50/200 EMA Crossover Scalper</option>
+                                <option>EMA Strategy</option>
                                 <option>Dynamic Grid Arbitrage</option>
                             </select>
                         </div>
@@ -87,7 +87,7 @@
                         <button onclick="clearLogs()" class="btn-clear">Clear Logs</button>
                     </div>
                     <div id="terminal-logs" class="terminal-body">
-                        [SYSTEM] Initialized Bybit API securely. Ready for live order placement.
+                        [SYSTEM] Initialized secure API connection. Ready for live order placement.
                     </div>
                 </div>
             </section>
@@ -160,7 +160,7 @@
                         <div class="price">$15<span>/14 days</span></div>
                         <ul>
                             <li>✔ 3 Concurrent Bots</li>
-                            <li>✔ Advanced FVG & EMA 50/200</li>
+                            <li>✔ Advanced FVG & Trend Filters</li>
                             <li>✔ Auto Break-Even (1:1.5 RR)</li>
                         </ul>
                         <button onclick="selectPlan('Pro Trader')" class="btn-primary">Select Plan</button>
