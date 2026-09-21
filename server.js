@@ -91,6 +91,11 @@ app.post('/api/gate/trade', async (req, res) => {
             rawQty = 3; 
         }
 
+        // Gate.io ki minimum limit 3 USDT hai
+        if (rawQty < 3) {
+            rawQty = 3;
+        }
+
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
         const url = '/spot/orders';
@@ -100,14 +105,18 @@ app.post('/api/gate/trade', async (req, res) => {
         const sSide = combinedData.side ? combinedData.side.toLowerCase() : 'buy';
         const symbol = combinedData.symbol || 'DOGE_USDT';
 
-        // Gate.io ki requirement ke mutabiq amount aur quote_amount dono bhejna lazmi hain
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
-            type: oType,
-            amount: rawQty.toString(),
-            quote_amount: rawQty.toString()
+            type: oType
         };
+
+        // Yahan par hum check karte hain ke market buy hai ya nahi, aur sirf zaroori parameter bhejte hain
+        if (oType === 'market' && sSide === 'buy') {
+            bodyObj.quote_amount = rawQty.toString();
+        } else {
+            bodyObj.amount = rawQty.toString();
+        }
 
         if (oType !== 'market') {
             bodyObj.price = combinedData.price ? combinedData.price.toString() : '0';
@@ -153,7 +162,7 @@ app.post('/api/gate/trade', async (req, res) => {
         }
 
         res.json({ success: true, data: data });
-    } catch (err) {
+    }caught (err) {
         res.status(500).json({ success: false, error: err.message || 'Failed to connect to trading server.' });
     }
 });
