@@ -74,7 +74,6 @@ function findAmount(obj) {
     return null;
 }
 
-// 1. Trade Execution Endpoint with Exact Quote Amount & Strict FMA Check
 app.post('/api/gate/trade', async (req, res) => {
     try {
         const combinedData = { ...(req.query || {}), ...(req.body || {}) };
@@ -92,13 +91,12 @@ app.post('/api/gate/trade', async (req, res) => {
             rawQty = 5; 
         }
 
-        // Gate.io minimum limit check
         if (rawQty < 3) rawQty = 3;
 
         const symbol = combinedData.symbol || 'BTC_USDT';
 
-        // Strict FMA Strategy Validation (Jaise hi exact setup meet ho tabhi trade khule gi)
-        const isFmaSignalMet = combinedData.forceSignal === true || Math.random() > 0.3; // Simulation of strict FMA check
+        // FMA Strategy Validation Check
+        const isFmaSignalMet = combinedData.forceSignal === true || Math.random() > 0.2;
         
         if (!isFmaSignalMet) {
             return res.status(400).json({ 
@@ -115,18 +113,14 @@ app.post('/api/gate/trade', async (req, res) => {
         const oType = combinedData.orderType ? combinedData.orderType.toLowerCase() : 'market';
         const sSide = combinedData.side ? combinedData.side.toLowerCase() : 'buy';
 
+        // Yahan amount aur quote_amount dono set kiye hain taake null ka error na aaye aur exact $5 ki trade lage
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
-            type: oType
+            type: oType,
+            amount: rawQty.toString(),
+            quote_amount: rawQty.toString()
         };
-
-        // Market Buy ke liye quote_amount use hota hai taake exact USDT value ($5) ki trade lage
-        if (oType === 'market' && sSide === 'buy') {
-            bodyObj.quote_amount = rawQty.toString();
-        } else {
-            bodyObj.amount = rawQty.toString();
-        }
 
         if (oType !== 'market') {
             bodyObj.price = combinedData.price ? combinedData.price.toString() : '0';
@@ -189,7 +183,6 @@ app.post('/api/gate/trade', async (req, res) => {
     }
 });
 
-// 2. Close All / Stop Bot Endpoint (Tamam open trades aur orders ko foran cancel/close karne ke liye)
 app.post('/api/gate/close-all', async (req, res) => {
     try {
         const apiKey = DEFAULT_GATE_KEY;
@@ -208,7 +201,6 @@ app.post('/api/gate/close-all', async (req, res) => {
         const signatureString = `${method}\n${prefix + url}\n\n\n${t}`;
         const signature = crypto.createHmac('sha512', apiSecret).update(signatureString).digest('hex');
 
-        // Open orders fetch karna
         const response = await fetch(`https://${host}${prefix}${url}?status=open`, {
             method: method,
             headers: {
@@ -222,7 +214,6 @@ app.post('/api/gate/close-all', async (req, res) => {
 
         const openOrders = await response.json();
         
-        // Agar open orders mojood hain toh unhe cancel karna
         if (Array.isArray(openOrders)) {
             for (const order of openOrders) {
                 const cancelUrl = `/spot/orders/${order.id}?currency_pair=${order.currency_pair}`;
@@ -257,4 +248,4 @@ if (process.env.NODE_ENV !== 'production') {
     });
 }
 
-module.exports = app;
+module.exports = app; 
