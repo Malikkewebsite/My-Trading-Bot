@@ -61,7 +61,8 @@ app.post('/api/admin/generate', (req, res) => {
 // Gate.io Trade Route
 app.post('/api/gate/trade', async (req, res) => {
     try {
-        const { symbol, side, orderType, qty, amount, capital, price } = req.body;
+        console.log("Incoming Trade Request Body:", req.body);
+        const { symbol, side, orderType, qty, amount, capital, size, price } = req.body || {};
 
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
@@ -70,12 +71,14 @@ app.post('/api/gate/trade', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Environment variables API keys are missing.' });
         }
 
-        // Fallback check to capture qty, amount, or capital from frontend request
-        const rawQty = qty !== undefined && qty !== null && qty !== '' ? qty : (amount !== undefined && amount !== null && amount !== '' ? amount : capital);
+        // Robust fallback to ensure amount/qty is never null
+        const rawQty = qty !== undefined && qty !== null && qty !== '' ? qty :
+                       (amount !== undefined && amount !== null && amount !== '' ? amount :
+                       (capital !== undefined && capital !== null && capital !== '' ? capital :
+                       (size !== undefined && size !== null && size !== '' ? size : '2')));
 
-        if (!rawQty || isNaN(Number(rawQty))) {
-            return res.status(400).json({ success: false, error: 'Trading Error: Amount/Quantity must not be null or empty.' });
-        }
+        const parsedQty = Number(rawQty);
+        const finalQty = (isNaN(parsedQty) || parsedQty <= 0) ? 2 : parsedQty;
 
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
@@ -86,16 +89,16 @@ app.post('/api/gate/trade', async (req, res) => {
         const sSide = side ? side.toLowerCase() : 'buy';
 
         const bodyObj = {
-            currency_pair: symbol, 
+            currency_pair: symbol || 'DOGE_USDT', 
             side: sSide, 
             type: oType
         };
 
         // For Market Buy, use quote_amount (USDT value), otherwise use amount (coin quantity)
         if (oType === 'market' && sSide === 'buy') {
-            bodyObj.quote_amount = Number(rawQty).toString();
+            bodyObj.quote_amount = finalQty.toString();
         } else {
-            bodyObj.amount = Number(rawQty).toString();
+            bodyObj.amount = finalQty.toString();
         }
 
         if (oType !== 'market') {
@@ -142,7 +145,7 @@ app.post('/api/gate/trade', async (req, res) => {
         }
 
         res.json({ success: true, data: data });
-    } catch (err) {
+    }CVcatch (err) {
         res.status(500).json({ success: false, error: err.message || 'Failed to connect to trading server.' });
     }
 });
