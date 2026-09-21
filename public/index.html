@@ -3,171 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Algo Trading Bot</title>
-    <style>
-        body {
-            background-color: #0b0e11;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        .config-card {
-            background: #181a20;
-            padding: 20px;
-            border-radius: 8px;
-            max-width: 500px;
-            margin: 0 auto;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 14px;
-            color: #848e9c;
-        }
-        select, input {
-            width: 100%;
-            padding: 10px;
-            background: #2b313a;
-            border: none;
-            color: #fff;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        .btn-container {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .btn-start {
-            background: #0ecb81;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            flex: 1;
-            font-weight: bold;
-        }
-        .btn-stop {
-            background: #f6465d;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            flex: 1;
-            font-weight: bold;
-        }
-        #error-box {
-            background: rgba(246, 70, 93, 0.15);
-            border: 1px solid #f6465d;
-            color: #f6465d;
-            padding: 12px;
-            border-radius: 4px;
-            margin-top: 15px;
-            display: none;
-            font-size: 14px;
-        }
-    </style>
+    <title>Crypto Bot Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header-modern">
+            <div class="brand-title">🚀 CRYPTO BOT PRO</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <div id="user-uid-badge" class="uid-badge-modern">UID: Loading...</div>
+                <button onclick="toggleAdminPanelModal()" style="background: #1f6feb; color: #fff; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">🛡️ Admin</button>
+            </div>
+        </header>
 
-    <div class="config-card">
-        <h2>Smart Algo Config</h2>
-        
-        <div class="form-group">
-            <label>Strategy Mode</label>
-            <select id="strategyMode">
-                <option>FMA Strategy</option>
-            </select>
-        </div>
+        <!-- Navigation Sidebar Tabs (API Settings Removed) -->
+        <nav class="sidebar">
+            <ul class="nav-links">
+                <li class="active" onclick="switchTab('trading')">📊 Trading Bot</li>
+                <li onclick="switchTab('funds')">💰 Fund Management</li>
+                <li onclick="switchTab('pricing')">👑 Pricing & Plans</li>
+            </ul>
+        </nav>
 
-        <div class="form-group">
-            <label>Capital Allocation ($ USDT)</label>
-            <input type="number" id="capitalInput" value="500">
-        </div>
+        <!-- Tab 1: Trading Bot Section -->
+        <section id="tab-trading" class="tab-section active">
+            <div class="search-box-wrapper" style="position:relative; margin-bottom: 15px;">
+                <input type="text" id="coin-search" placeholder="Search Spot coins (e.g. BTCUSDT).." oninput="filterCoins()" onclick="showCoinDropdown()">
+                <div id="coin-dropdown" class="coin-dropdown hidden"></div>
+            </div>
 
-        <div class="form-group">
-            <label>Risk Per Trade (%)</label>
-            <input type="number" id="riskInput" value="2.0">
-        </div>
+            <div class="balance-bar" style="display: flex; justify-content: space-between; align-items: center; background: #161b22; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                <div>
+                    <span style="font-size: 12px; color: #8b949e;">BALANCE</span>
+                    <h3 id="header-balance" style="color: #3fb950; margin: 0;">$500.00</h3>
+                </div>
+                <div id="plan-status-badge" class="plan-badge locked" style="background: #21262d; padding: 6px 12px; border-radius: 6px; color: #f85149; font-size: 13px;">🔒 Locked</div>
+            </div>
 
-        <div class="btn-container">
-            <button class="btn-start" id="startBotBtn">▶ Start Live Bot</button>
-            <button class="btn-stop" id="stopBotBtn">■ Stop Bot</button>
-        </div>
+            <div class="coin-info-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 id="selected-coin-title" style="margin: 0;">BTCUSDT</h3>
+                <div>
+                    <span id="coin-price" style="font-size: 16px; font-weight: bold; margin-right: 10px;">$--.--</span>
+                    <span id="coin-change" style="font-size: 14px;">+0.00%</span>
+                </div>
+            </div>
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 10px;">15m Live Candle (FMA Active)</div>
 
-        <div id="error-box"></div>
+            <div id="tv-chart-frame" style="width: 100%; height: 350px; background: #161b22; border-radius: 10px; margin-bottom: 20px;"></div>
+
+            <div class="config-panel" style="background: #161b22; padding: 15px; border-radius: 10px;">
+                <h3>🤖 Smart Algo Config</h3>
+                
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>Strategy Mode</label>
+                    <select id="strategy-select" style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
+                        <option value="FMA Strategy">FMA Strategy</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>Capital Allocation ($ USDT)</label>
+                    <input type="number" id="capital-input" value="500" style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
+                </div>
+
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>Risk Per Trade (%)</label>
+                    <input type="number" id="risk-input" value="2.0" style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
+                </div>
+
+                <div class="action-buttons" style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button onclick="startBot()" style="flex: 1; padding: 12px; background: #238636; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">▶ Start Live Bot</button>
+                    <button onclick="stopBot()" style="flex: 1; padding: 12px; background: #da3633; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">⏹ Stop Bot</button>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 13px; color: #8b949e;">
+                    <span>Session PnL: <strong style="color: #3fb950;" id="session-pnl">+$0.00</strong></span>
+                    <span>Active Trades: <strong id="active-trades-count">0</strong></span>
+                </div>
+            </div>
+
+            <div class="terminal-box" style="margin-top: 20px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 13px; color: #8b949e;">FMA Strategy Execution & Signal Logs</span>
+                    <button onclick="clearLogs()" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">Clear Logs</button>
+                </div>
+                <div id="terminal-logs" style="font-family: monospace; font-size: 12px; color: #3fb950; height: 120px; overflow-y: auto;">
+                    [SYSTEM] FMA Strategy initialized with backend execution.<br>Monitoring live market setups...
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab 2: Fund Management -->
+        <section id="tab-funds" class="tab-section hidden">
+            <h3>💰 Fund Management & Deposit</h3>
+            <div style="background: #161b22; padding: 15px; border-radius: 10px; margin-top: 15px;">
+                <label>Deposit Method</label>
+                <select id="deposit-method" style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 10px;">
+                    <option value="USDT">USDT (TRC20)</option>
+                    <option value="Easypaisa">Easypaisa (03125124424)</option>
+                </select>
+                <p style="font-size: 13px; color: #8b949e;">Official Address: <span id="display-usdt-wallet" style="color: #fff;">Loading...</span></p>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>Amount ($)</label>
+                    <input type="number" id="deposit-amount" placeholder="Enter amount..." style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>Transaction Hash / Receipt ID</label>
+                    <input type="text" id="tx-hash-input" placeholder="Enter transaction reference..." style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
+                </div>
+                <button onclick="submitDeposit()" style="margin-top: 15px; width: 100%; padding: 12px; background: #238636; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Submit Deposit Proof</button>
+            </div>
+        </section>
+
+        <!-- Tab 3: Pricing & Activation Plans (Colorful & Detailed Features) -->
+        <section id="tab-pricing" class="tab-section hidden">
+            <h3>👑 Pricing & Activation Plans</h3>
+            
+            <div style="background: rgba(31, 111, 235, 0.15); border: 1px solid #1f6feb; padding: 12px; border-radius: 8px; margin-top: 15px; font-size: 13px; color: #c9d1d9;">
+                ⚠️ <strong>Important Notice:</strong> First you have to contact the admin to get your VIP passcode and unlock the automated algo bot.
+            </div>
+
+            <!-- Colorful Detailed Plans -->
+            <div style="display: grid; gap: 15px; margin-top: 15px;">
+                <div onclick="selectPlan('Starter Plan', '10')" style="background: #161b22; border: 2px solid #3fb950; padding: 15px; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(63, 185, 80, 0.1);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; color: #3fb950; font-size: 16px;">🌱 Starter Plan</h4>
+                        <span style="background: rgba(63, 185, 80, 0.2); color: #3fb950; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold;">7 Days Access</span>
+                    </div>
+                    <p style="margin: 8px 0; font-size: 13px; color: #8b949e;">Basic 15m FMA Strategy, Single Coin Execution, Standard Support</p>
+                    <strong style="color: #3fb950; font-size: 18px;">$10 / 7 Days</strong>
+                </div>
+
+                <div onclick="selectPlan('Pro Plan', '18')" style="background: #161b22; border: 2px solid #1f6feb; padding: 15px; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(31, 111, 235, 0.15);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; color: #58a6ff; font-size: 16px;">⚡ Pro Plan 👑</h4>
+                        <span style="background: rgba(31, 111, 235, 0.2); color: #58a6ff; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold;">15 Days Access</span>
+                    </div>
+                    <p style="margin: 8px 0; font-size: 13px; color: #8b949e;">Advanced FMA Strategy, Multi-Coin Support, Priority Signals & Fast Execution</p>
+                    <strong style="color: #58a6ff; font-size: 18px;">$18 / 15 Days</strong>
+                </div>
+
+                <div onclick="selectPlan('Ultimate VIP Plan', '36')" style="background: #161b22; border: 2px solid #d29922; padding: 15px; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(210, 153, 34, 0.15);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; color: #d29922; font-size: 16px;">🔥 Ultimate VIP Plan 🚀</h4>
+                        <span style="background: rgba(210, 153, 34, 0.2); color: #d29922; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold;">30 Days Access</span>
+                    </div>
+                    <p style="margin: 8px 0; font-size: 13px; color: #8b949e;">Unlimited Access, Backend API Auto-Trading, Zero Latency & 24/7 VIP Support</p>
+                    <strong style="color: #d29922; font-size: 18px;">$36 / 30 Days</strong>
+                </div>
+            </div>
+
+            <!-- Passcode Activation -->
+            <div style="background: #161b22; padding: 15px; border-radius: 10px; margin-top: 15px;">
+                <p style="color: #8b949e; font-size: 14px;">Already received your passcode from admin? Enter it below:</p>
+                <input type="text" id="passcode-input" placeholder="Enter Passcode (e.g. PRO-XXXXXX)..." style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 10px;">
+                <button onclick="redeemPasscode()" style="width: 100%; padding: 12px; background: #1f6feb; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Unlock Pro Access</button>
+            </div>
+
+            <!-- WhatsApp Admin Contact Button -->
+            <div style="margin-top: 15px; text-align: center;">
+                <a href="https://wa.me/923125124424?text=Hello%20Admin,%20I%20want%20to%20buy%20Crypto%20Bot%20Pro%20access%20passcode." target="_blank" style="display: block; background: #238636; color: #fff; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                    💬 Contact Admin on WhatsApp (03125124424)
+                </a>
+            </div>
+        </section>
     </div>
 
-    <script>
-        document.getElementById('startBotBtn').addEventListener('click', async () => {
-            const capital = document.getElementById('capitalInput').value;
+    <!-- Master Admin Dashboard Modal (Jaise video mein hai) -->
+    <div id="admin-modal" class="modal-backdrop hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 15px;">
+        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 12px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 20px; box-shadow: 0 10px 35px rgba(0,0,0,0.8);">
             
-            const tradeData = {
-                symbol: 'BTCUSDT',
-                side: 'Buy',
-                orderType: 'Market',
-                qty: capital,
-                testnet: false
-            };
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #30363d; padding-bottom: 10px;">
+                <h3 style="margin: 0; color: #58a6ff;">🛡️ Master Admin Dashboard</h3>
+                <button onclick="toggleAdminPanelModal()" style="background: none; border: none; color: #8b949e; font-size: 18px; cursor: pointer;">✕</button>
+            </div>
 
-            await handleTradeExecution(tradeData);
-        });
+            <!-- Admin Login Box -->
+            <div id="admin-login-box">
+                <p style="font-size: 13px; color: #8b949e; margin-bottom: 10px;">Enter admin password to manage passcodes and users:</p>
+                <input type="password" id="admin-key-input" placeholder="Enter Admin Secret..." style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 10px;">
+                <button onclick="adminLogin()" style="width: 100%; padding: 12px; background: #238636; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Login Admin</button>
+            </div>
 
-        async function handleTradeExecution(tradeData) {
-            try {
-                clearErrors();
+            <!-- Admin Full Functional Dashboard -->
+            <div id="admin-dashboard-content" class="hidden">
+                <!-- Admin Sub-tabs -->
+                <div style="display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button onclick="switchAdminTab('passcodes')" class="admin-tab-btn active" style="flex: 1; padding: 8px; background: #1f6feb; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-size: 12px;">Passcodes</button>
+                    <button onclick="switchAdminTab('users')" class="admin-tab-btn" style="flex: 1; padding: 8px; background: #21262d; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-size: 12px;">Users</button>
+                    <button onclick="switchAdminTab('financials')" class="admin-tab-btn" style="flex: 1; padding: 8px; background: #21262d; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-size: 12px;">Financials</button>
+                    <button onclick="switchAdminTab('bot')" class="admin-tab-btn" style="flex: 1; padding: 8px; background: #21262d; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-size: 12px;">Bot Control</button>
+                </div>
 
-                const response = await fetch('/api/bybit/trade', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(tradeData)
-                });
+                <!-- Section 1: Passcodes Generator -->
+                <div id="admin-section-passcodes" class="admin-sub-section">
+                    <h4 style="margin-bottom: 8px; color: #3fb950;">Live One-Time Short Passcodes</h4>
+                    <select id="passcode-tier-input" style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 10px;">
+                        <option value="Starter Plan ($10/7D)">Starter Plan ($10 / 7 Days)</option>
+                        <option value="Pro Plan ($18/15D)">Pro Plan ($18 / 15 Days)</option>
+                        <option value="Ultimate VIP Plan ($36/30D)">Ultimate VIP Plan ($36 / 30 Days)</option>
+                    </select>
+                    <button onclick="generatePasscode()" style="width: 100%; padding: 10px; background: #1f6feb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 10px;">Generate Passcode</button>
+                    <div id="generated-code-display" style="background: #0d1117; padding: 10px; border-radius: 6px; font-size: 13px; color: #3fb950; margin-bottom: 15px; text-align: center;">No code generated yet.</div>
+                </div>
 
-                const result = await response.json();
+                <!-- Section 2: User Control & Wallet Adjustments -->
+                <div id="admin-section-users" class="admin-sub-section hidden">
+                    <h4 style="margin-bottom: 8px; color: #58a6ff;">User Control & Wallet Adjustments</h4>
+                    <div style="background: #0d1117; padding: 10px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-size: 12px; color: #8b949e;" id="admin-uid-text">UID-781988</span><br>
+                            <strong style="color: #3fb950;" id="admin-wallet-bal">$97.92</strong>
+                        </div>
+                        <div>
+                            <button onclick="freezeUser()" style="background: #da3633; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">Freeze</button>
+                            <button onclick="editUserBalance()" style="background: #238636; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">Edit $</button>
+                        </div>
+                    </div>
+                </div>
 
-                // If response is not ok or success is false, display error and STOP immediately
-                if (!response.ok || !result.success) {
-                    let errorMsg = result.error || 'Failed to process request. Please check configuration.';
-                    
-                    // Remove any reference to specific exchange names from the error
-                    errorMsg = errorMsg.replace(/Bybit/gi, 'Trading');
+                <!-- Section 3: Financials & Pending Deposits -->
+                <div id="admin-section-financials" class="admin-sub-section hidden">
+                    <h4 style="margin-bottom: 8px; color: #d29922;">Pending Deposits & Withdrawals</h4>
+                    <div id="admin-deposits-list" style="background: #0d1117; padding: 10px; border-radius: 6px; font-size: 12px; color: #8b949e; text-align: center;">
+                        No pending requests.
+                    </div>
+                </div>
 
-                    showErrorAlert(errorMsg);
-                    return; // Crucial: prevents success popup from showing on error
-                }
+                <!-- Section 4: Bot Control & Rules -->
+                <div id="admin-section-bot" class="admin-sub-section hidden">
+                    <h4 style="margin-bottom: 8px; color: #f85149;">Master Bot & Risk Rules</h4>
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 12px; color: #8b949e;">Global System Emergency Switch</label>
+                        <button onclick="pauseAllBots()" style="width: 100%; margin-top: 5px; padding: 10px; background: #da3633; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Pause All Bots</button>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 12px; color: #8b949e;">Max Allowed Risk Per Trade (%)</label>
+                        <input type="number" value="10" style="width: 100%; padding: 8px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-top: 5px;">
+                    </div>
+                </div>
 
-                // Triggers ONLY when trade execution is fully verified and successful
-                showSuccessAlert('Bot started successfully with automated execution!');
+            </div>
+        </div>
+    </div>
 
-            } catch (err) {
-                let cleanError = err.message ? err.message.replace(/Bybit/gi, 'Trading') : 'An unexpected error occurred.';
-                showErrorAlert(cleanError);
-            }
-        }
-
-        function showErrorAlert(message) {
-            const errorBox = document.getElementById('error-box');
-            errorBox.innerText = `Error: ${message}`;
-            errorBox.style.display = 'block';
-        }
-
-        function showSuccessAlert(message) {
-            alert(message);
-        }
-
-        function clearErrors() {
-            const errorBox = document.getElementById('error-box');
-            errorBox.style.display = 'none';
-            errorBox.innerText = '';
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
