@@ -113,14 +113,18 @@ app.post('/api/gate/trade', async (req, res) => {
         const oType = combinedData.orderType ? combinedData.orderType.toLowerCase() : 'market';
         const sSide = combinedData.side ? combinedData.side.toLowerCase() : 'buy';
 
-        // Yahan amount aur quote_amount dono set kiye hain taake null ka error na aaye aur exact $5 ki trade lage
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
-            type: oType,
-            amount: rawQty.toString(),
-            quote_amount: rawQty.toString()
+            type: oType
         };
+
+        // Sirf quote_amount use hoga taake exact USDT value (jaise $5) deduct ho aur balance ka error na aaye
+        if (oType === 'market' && sSide === 'buy') {
+            bodyObj.quote_amount = rawQty.toString();
+        } else {
+            bodyObj.amount = rawQty.toString();
+        }
 
         if (oType !== 'market') {
             bodyObj.price = combinedData.price ? combinedData.price.toString() : '0';
@@ -222,7 +226,7 @@ app.post('/api/gate/close-all', async (req, res) => {
                 const cancelSigStr = `${cancelMethod}\n${prefix + cancelUrl}\n\n\n${cancelT}`;
                 const cancelSig = crypto.createHmac('sha512', apiSecret).update(cancelSigStr).digest('hex');
 
-                await fetch(`https://${host}${prefix}${cancelUrl}`, {
+                await fetch(`https://${host}${cancelUrl}`, {
                     method: cancelMethod,
                     headers: {
                         'Accept': 'application/json',
@@ -248,4 +252,4 @@ if (process.env.NODE_ENV !== 'production') {
     });
 }
 
-module.exports = app; 
+module.exports = app;
