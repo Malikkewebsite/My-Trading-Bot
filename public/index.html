@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CRYPTO BOT PRO - Advanced Automated Trading</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -27,14 +28,19 @@
             <!-- Top Header Bar -->
             <header class="top-bar">
                 <div class="search-box-wrapper">
-                    <input type="text" id="coin-search" placeholder="Search coins (e.g. BTCUSDT, ETHUSDT)..." oninput="filterCoins()" onfocus="showCoinDropdown()">
+                    <input type="text" id="coin-search" placeholder="Search Bybit Spot coins (e.g. BTCUSDT)..." oninput="filterCoins()" onfocus="showCoinDropdown()">
                     <div id="coin-dropdown" class="coin-dropdown hidden"></div>
                 </div>
                 <div class="user-quick-info">
-                    <span id="header-balance" class="balance-display">Balance: $0.00</span>
-                    <span id="plan-status-badge" class="plan-badge locked">🔒 Plan Locked</span>
-                    <input type="password" id="passcode-input" placeholder="Enter Passcode">
-                    <button onclick="redeemPasscode()" class="btn-sm">Unlock</button>
+                    <div class="balance-pill">
+                        <span class="balance-label">Balance</span>
+                        <span id="header-balance" class="balance-display">$0.00</span>
+                    </div>
+                    <span id="plan-status-badge" class="plan-badge locked">🔒 Locked</span>
+                    <div class="passcode-wrapper">
+                        <input type="password" id="passcode-input" placeholder="Passcode">
+                        <button onclick="redeemPasscode()" class="btn-unlock">Unlock</button>
+                    </div>
                 </div>
             </header>
 
@@ -43,12 +49,18 @@
                 <div class="trading-grid">
                     <div class="chart-panel">
                         <div class="coin-header-info">
-                            <h3 id="selected-coin-title">BTC/USDT</h3>
-                            <span id="coin-price" class="price-tag">$--.--</span>
-                            <span id="coin-change" class="change-tag">+0.00%</span>
+                            <div>
+                                <h3 id="selected-coin-title">BTCUSDT</h3>
+                                <span class="timeframe-tag">15m Live Candle</span>
+                            </div>
+                            <div class="price-box-right">
+                                <span id="coin-price" class="price-tag">$--.--</span>
+                                <span id="coin-change" class="change-tag">+0.00%</span>
+                            </div>
                         </div>
-                        <div class="mock-chart-box">
-                            <canvas id="priceCanvas"></canvas>
+                        <!-- TradingView Real-Time 15m Chart Widget Container -->
+                        <div class="tradingview-widget-container" id="tradingview-widget">
+                            <div id="tv-chart-frame" style="width:100%;height:100%;"></div>
                         </div>
                     </div>
 
@@ -87,7 +99,7 @@
                         <button onclick="clearLogs()" class="btn-clear">Clear Logs</button>
                     </div>
                     <div id="terminal-logs" class="terminal-body">
-                        [SYSTEM] Initialized secure API connection. Ready for live order placement.
+                        [SYSTEM] Secure connection established with exchange feed. 15m candle stream active.
                     </div>
                 </div>
             </section>
@@ -243,9 +255,7 @@
                                         <th>Action</th>
                                     </tr>
                                 </thead>
-                                <tbody id="admin-tx-tbody">
-                                    <!-- Dynamic rows -->
-                                </tbody>
+                                <tbody id="admin-tx-tbody"></tbody>
                             </table>
                         </div>
                     </div>
@@ -253,6 +263,8 @@
             </section>
         </main>
     </div>
+    <!-- TradingView Widget Script -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
