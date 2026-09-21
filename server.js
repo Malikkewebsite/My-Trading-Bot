@@ -76,17 +76,24 @@ app.post('/api/gate/trade', async (req, res) => {
         const method = 'POST';
 
         const oType = orderType ? orderType.toLowerCase() : 'market';
+        const sSide = side ? side.toLowerCase() : 'buy';
+
         const bodyObj = {
             currency_pair: symbol, 
-            side: side.toLowerCase(), 
-            type: oType,
-            amount: qty.toString()
+            side: sSide, 
+            type: oType
         };
+
+        // Market Buy ke liye quote_amount use hota hai (USDT ki value), warna normal amount
+        if (oType === 'market' && sSide === 'buy') {
+            bodyObj.quote_amount = qty.toString();
+        } else {
+            bodyObj.amount = qty.toString();
+        }
 
         if (oType !== 'market') {
             bodyObj.price = price ? price.toString() : '0';
         } else {
-            // Market order ke liye ioc dena zaroori hai taake gtc ka error na aaye
             bodyObj.time_in_force = 'ioc';
         }
 
