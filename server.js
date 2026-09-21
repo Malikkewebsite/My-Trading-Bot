@@ -25,7 +25,6 @@ app.get('/', (req, res) => {
     }
 });
 
-// Deposit settings route to fix loading issue
 app.get('/api/settings', (req, res) => {
     res.json({
         success: true,
@@ -40,7 +39,6 @@ app.get('/api/deposit/info', (req, res) => {
     });
 });
 
-// Admin Passcode generation route to fix passcode issue
 app.post('/api/admin/passcode', (req, res) => {
     const { plan } = req.body || {};
     const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -59,6 +57,26 @@ app.post('/api/admin/generate', (req, res) => {
     });
 });
 
+// Deep recursive search function to find amount/capital anywhere in the request body
+function findAmount(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    
+    const keys = ['qty', 'amount', 'capital', 'size', 'capitalAllocation', 'capital_allocation', 'allocation', 'usdt', 'value'];
+    for (const key of keys) {
+        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '' && !isNaN(Number(obj[key]))) {
+            return Number(obj[key]);
+        }
+    }
+    
+    for (const val of Object.values(obj)) {
+        if (val && typeof val === 'object') {
+            const found = findAmount(val);
+            if (found !== null) return found;
+        }
+    }
+    return null;
+}
+
 // Gate.io Trade Route
 app.post('/api/gate/trade', async (req, res) => {
     try {
@@ -72,28 +90,11 @@ app.post('/api/gate/trade', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Environment variables API keys are missing.' });
         }
 
-        // Exhaustive fallback to capture amount/capital/qty from any source
-        let rawQty = combinedData.qty ?? 
-                     combinedData.amount ?? 
-                     combinedData.capital ?? 
-                     combinedData.size ?? 
-                     combinedData.capitalAllocation ?? 
-                     combinedData.capital_allocation ?? 
-                     combinedData.allocation ?? 
-                     combinedData.usdt ?? 
-                     combinedData.value;
-
-        if (rawQty === undefined || rawQty === null || rawQty === '' || isNaN(Number(rawQty))) {
-            for (const val of Object.values(combinedData)) {
-                if (typeof val === 'number' || (typeof val === 'string' && !isNaN(val) && val.trim() !== '')) {
-                    rawQty = val;
-                    break;
-                }
-            }
+        // Use deep search to extract amount securely
+        let rawQty = findAmount(combinedData);
+        if (rawQty === null || isNaN(rawQty) || rawQty <= 0) {
+            rawQty = 1; // absolute safe fallback
         }
-
-        const parsedQty = Number(rawQty);
-        const finalQty = (isNaN(parsedQty) || parsedQty <= 0) ? 1 : parsedQty;
 
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
@@ -110,11 +111,10 @@ app.post('/api/gate/trade', async (req, res) => {
             type: oType
         };
 
-        // Correct parameter mapping for Gate.io API v4
         if (oType === 'market' && sSide === 'buy') {
-            bodyObj.quote_amount = finalQty.toString();
+            bodyObj.quote_amount = rawQty.toString();
         } else {
-            bodyObj.amount = finalQty.toString();
+            bodyObj.amount = rawQty.toString();
         }
 
         if (oType !== 'market') {
@@ -131,7 +131,7 @@ app.post('/api/gate/trade', async (req, res) => {
         const signatureString = `${method}\n${prefix + url}\n\n${hashedPayload}\n${t}`;
         const signature = crypto.createHmac('sha512', apiSecret).update(signatureString).digest('hex');
 
-        const response = await fetch(`https://${host}${prefix}${url}`, {
+        const response =- await fetch(`https://${host}${prefix}${url}`, {
             method: method,
             headers: {
                 'Accept': 'application/json',
@@ -166,7 +166,6 @@ app.post('/api/gate/trade', async (req, res) => {
     }
 });
 
-// local development server listener vs Vercel serverless export
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
