@@ -24,6 +24,40 @@ app.get('/', (req, res) => {
     }
 });
 
+// Deposit settings route to fix loading issue
+app.get('/api/settings', (req, res) => {
+    res.json({
+        success: true,
+        depositAddress: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345'
+    });
+});
+
+app.get('/api/deposit/info', (req, res) => {
+    res.json({
+        success: true,
+        address: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345'
+    });
+});
+
+// Admin Passcode generation route to fix passcode issue
+app.post('/api/admin/passcode', (req, res) => {
+    const { plan } = req.body;
+    const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    res.json({
+        success: true,
+        passcode: randomCode,
+        plan: plan || 'Starter Plan'
+    });
+});
+
+app.post('/api/admin/generate', (req, res) => {
+    const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    res.json({
+        success: true,
+        passcode: randomCode
+    });
+});
+
 // Gate.io Trade Route
 app.post('/api/gate/trade', async (req, res) => {
     try {
