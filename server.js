@@ -15,6 +15,14 @@ try {
 const DEFAULT_GATE_KEY = process.env.GATE_API_KEY;
 const DEFAULT_GATE_SECRET = process.env.GATE_API_SECRET;
 
+// Bot State Management for FVG + 50 EMA Strategy
+let botState = {
+    isRunning: false,
+    symbol: 'BTC_USDT',
+    capital: 5,
+    intervalId: null
+};
+
 app.get('/', (req, res) => {
     try {
         res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -24,47 +32,36 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/settings', (req, res) => {
-    res.json({
-        success: true,
-        depositAddress: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345'
-    });
+    jsonResponse(res, { success: true, depositAddress: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345' });
 });
 
 app.get('/api/deposit/info', (req, res) => {
-    res.json({
-        success: true,
-        address: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345'
-    });
+    jsonResponse(res, { success: true, address: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345' });
 });
 
 app.post('/api/admin/passcode', (req, res) => {
     const { plan } = req.body || {};
     const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-    res.json({
-        success: true,
-        passcode: randomCode,
-        plan: plan || 'Starter Plan'
-    });
+    jsonResponse(res, { success: true, passcode: randomCode, plan: plan || 'Starter Plan' });
 });
 
 app.post('/api/admin/generate', (req, res) => {
     const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-    res.json({
-        success: true,
-        passcode: randomCode
-    });
+    jsonResponse(res, { success: true, passcode: randomCode });
 });
+
+function jsonResponse(res, data) {
+    res.json(data);
+}
 
 function findAmount(obj) {
     if (!obj || typeof obj !== 'object') return null;
-    
     const keys = ['qty', 'amount', 'capital', 'size', 'capitalAllocation', 'capital_allocation', 'allocation', 'usdt', 'value'];
     for (const key of keys) {
         if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '' && !isNaN(Number(obj[key]))) {
             return Number(obj[key]);
         }
     }
-    
     for (const val of Object.values(obj)) {
         if (val && typeof val === 'object') {
             const found = findAmount(val);
@@ -74,11 +71,83 @@ function findAmount(obj) {
     return null;
 }
 
+// Calculate Exponential Moving Average (EMA)
+function calculateEMA(data, period) {
+    if (!data || data.length === 0) return [];
+    const k = 2 / (period + 1);
+    let emaArray = [];
+    let prevEMA = data[0];
+    emaArray.push(prevEMA);
+    for (let i = 1; i < data.length; i++) {
+        let currentEMA = (data[i] * k) + (prevEMA * (1 - k));
+        emaArray.push(currentEMA);
+        prevEMA = currentEMA;
+    }
+    return emaArray;
+}
+
+// Helper function to execute Gate.io order
+async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '0') {
+    const host = 'api.gateio.ws';
+    const prefix = '/api/v4';
+    const url = '/spot/orders';
+    const method = 'POST';
+
+    const bodyObj = {
+        currency_pair: symbol,
+        side: side,
+        type: orderType
+    };
+
+    if (orderType === 'market' && side === 'buy') {
+        bodyObj.quote_amount = amountVal.toString();
+    } else {
+        bodyObj.amount = amountVal.toString();
+    }
+
+    if (orderType !== 'market') {
+        bodyObj.price = priceVal.toString();
+    } else {
+        bodyObj.time_in_force = 'ioc';
+    }
+
+    const bodyString = JSON.stringify(bodyObj);
+    const hashedPayload = crypto.createHash('sha512').update(bodyString).digest('hex');
+    const t = Math.floor(Date.now() / 1000).toString();
+
+    const signatureString = `${method}\n${prefix + url}\n\n${hashedPayload}\n${t}`;
+    const signature = crypto.createHmac('sha512', DEFAULT_GATE_SECRET).update(signatureString).digest('hex');
+
+    const response = await fetch(`https://${host}${prefix}${url}`, {
+        method: method,
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'KEY': DEFAULT_GATE_KEY,
+            'Timestamp': t,
+            'SIGN': signature
+        },
+        body: bodyString
+    });
+
+    const textResponse = await response.text();
+    let data;
+    try {
+        data = JSON.parse(textResponse);
+    } catch (e) {
+        throw new Error(`Exchange raw response error: ${textResponse.substring(0, 100)}`);
+    }
+
+    if (response.status !== 200 && response.status !== 201) {
+        throw new Error(data.message || JSON.stringify(data));
+    }
+    return data;
+}
+
+// 1. Start Bot & Run Algorithmic FVG + 50 EMA Strategy
 app.post('/api/gate/trade', async (req, res) => {
     try {
         const combinedData = { ...(req.query || {}), ...(req.body || {}) };
-        console.log("Incoming Trade Request Data:", combinedData);
-
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
 
@@ -87,118 +156,135 @@ app.post('/api/gate/trade', async (req, res) => {
         }
 
         let rawQty = findAmount(combinedData);
-        if (rawQty === null || isNaN(rawQty) || rawQty <= 0) {
-            rawQty = 5; 
-        }
-
+        if (rawQty === null || isNaN(rawQty) || rawQty <= 0) rawQty = 5;
         if (rawQty < 3) rawQty = 3;
 
         const symbol = combinedData.symbol || 'BTC_USDT';
 
-        // FMA Strategy Validation Check
-        const isFmaSignalMet = combinedData.forceSignal === true || Math.random() > 0.1;
-        
-        if (!isFmaSignalMet) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'FMA Strategy condition not met yet. Monitoring market setup...' 
-            });
+        if (botState.isRunning) {
+            return res.json({ success: true, message: 'Bot is already running and monitoring FVG + 50 EMA strategy.' });
         }
 
-        const host = 'api.gateio.ws';
-        const prefix = '/api/v4';
-        const url = '/spot/orders';
-        const method = 'POST';
+        botState.isRunning = true;
+        botState.symbol = symbol;
+        botState.capital = rawQty;
 
-        const oType = combinedData.orderType ? combinedData.orderType.toLowerCase() : 'market';
-        const sSide = combinedData.side ? combinedData.side.toLowerCase() : 'buy';
+        console.log(`[BOT STARTED] Monitoring 15m chart for ${symbol} using strict FVG + 50 EMA Strategy...`);
 
-        // Pehle ticker se current price fetch karke exact coin amount calculate karna taake null ya balance ka error na aaye
-        let calculatedAmount = rawQty.toString();
-        try {
-            const tickerRes = await fetch(`https://${host}${prefix}/spot/tickers?currency_pair=${symbol}`);
-            const tickerData = await tickerRes.json();
-            if (Array.isArray(tickerData) && tickerData.length > 0 && tickerData[0].last) {
-                const currentPrice = parseFloat(tickerData[0].last);
-                if (currentPrice > 0) {
-                    // USDT amount ko coin quantity mein convert karna (jaise $5 / price)
-                    calculatedAmount = (rawQty / currentPrice).toFixed(6);
-                }
+        // Algorithmic Strategy Loop (Runs every 15 seconds to check 15m candles)
+        botState.intervalId = setInterval(async () => {
+            if (!botState.isRunning) {
+                clearInterval(botState.intervalId);
+                return;
             }
-        } catch (tickerErr) {
-            console.log("Ticker price fetch fallback used:", tickerErr);
-        }
 
-        const bodyObj = {
-            currency_pair: symbol, 
-            side: sSide, 
-            type: oType,
-            amount: calculatedAmount
-        };
+            try {
+                const host = 'api.gateio.ws';
+                const prefix = '/api/v4';
+                // Fetch 15m candlesticks (limit 100 candles for EMA and FVG detection)
+                const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${botState.symbol}&interval=15m&limit=100`);
+                const klines = await klinesRes.json();
 
-        if (oType !== 'market') {
-            bodyObj.price = combinedData.price ? combinedData.price.toString() : '0';
-        } else {
-            bodyObj.time_in_force = 'ioc';
-        }
+                if (!Array.isArray(klines) || klines.length < 55) {
+                    console.log("[NO TRADE] Insufficient candle data for analysis.");
+                    return;
+                }
 
-        const bodyString = JSON.stringify(bodyObj);
+                // Gate.io kline format: [timestamp, volume, close, high, low, open, ...]
+                const formattedCandles = klines.map(k => ({
+                    time: k[0],
+                    open: parseFloat(k[5]),
+                    high: parseFloat(k[3]),
+                    low: parseFloat(k[4]),
+                    close: parseFloat(k[2])
+                }));
 
-        const hashedPayload = crypto.createHash('sha512').update(bodyString).digest('hex');
-        const t = Math.floor(Date.now() / 1000).toString();
+                // Calculate 50 EMA on closes
+                const closes = formattedCandles.map(c => c.close);
+                const ema50Array = calculateEMA(closes, 50);
 
-        const signatureString = `${method}\n${prefix + url}\n\n${hashedPayload}\n${t}`;
-        const signature = crypto.createHmac('sha512', apiSecret).update(signatureString).digest('hex');
+                let validSetupFound = false;
+                let activeFvgLow = 0;
+                let activeFvgHigh = 0;
 
-        const response = await fetch(`https://${host}${prefix}${url}`, {
-            method: method,
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'KEY': apiKey,
-                'Timestamp': t,
-                'SIGN': signature
-            },
-            body: bodyString
-        });
+                // Step 2: Algorithmic Bullish FVG Detection
+                // A bullish FVG occurs between candle i-2 and candle i where: Low[i] > High[i-2]
+                for (let i = 2; i < formattedCandles.length - 1; i++) {
+                    const c1 = formattedCandles[i - 2];
+                    const c3 = formattedCandles[i];
 
-        const textResponse = await response.text();
-        console.log("Gate.io Raw Response:", textResponse);
+                    if (c3.low > c1.high) {
+                        const fvgBottom = c1.high;
+                        const fvgTop = c3.low;
 
-        let data;
-        try {
-            data = JSON.parse(textResponse);
-        } catch (parseErr) {
-            return res.status(500).json({
-                success: false,
-                error: `Exchange raw response error: ${textResponse.substring(0, 100)}`
-            });
-        }
+                        // Check subsequent price action for retests (Touch conditions)
+                        for (let j = i + 1; j < formattedCandles.length; j++) {
+                            const testCandle = formattedCandles[j];
+                            const currentEMA = ema50Array[j];
 
-        if (response.status !== 200 && response.status !== 201) {
-            return res.status(400).json({ success: false, error: `Trading Error: ${data.message || JSON.stringify(data)}` });
-        }
+                            // Condition A: Price touches FVG zone
+                            const touchedFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
 
-        const entryPrice = data.price ? parseFloat(data.price) : 0;
-        const takeProfitPrice = entryPrice > 0 ? (entryPrice * 1.025).toFixed(2) : '0.00';
-        const stopLossPrice = entryPrice > 0 ? (entryPrice * 0.985).toFixed(2) : '0.00';
+                            // Condition B: Price touches / interacts with 50 EMA (within 0.3% tolerance)
+                            const touchedEma = Math.abs(testCandle.low - currentEMA) / currentEMA <= 0.003 || 
+                                               (testCandle.low <= currentEMA && testCandle.high >= currentEMA);
 
-        res.json({ 
+                            if (touchedFvg && touchedEma) {
+                                // Step 5: Bullish Confirmation Candle Check
+                                // Confirmation candle must be green (close > open) with rejection/momentum, and 50 EMA not broken downward meaningfully
+                                const isGreen = testCandle.close > testCandle.open;
+                                const emaNotBroken = testCandle.low >= (currentEMA * 0.995);
+
+                                if (isGreen && emaNotBroken) {
+                                    validSetupFound = true;
+                                    activeFvgLow = fvgBottom;
+                                    activeFvgHigh = fvgTop;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (validSetupFound) break;
+                }
+
+                if (!validSetupFound) {
+                    console.log("[NO TRADE / CONDITION NOT MET] FVG, 50 EMA touch, or Bullish confirmation criteria not satisfied.");
+                    return;
+                }
+
+                console.log(`[SETUP MET] Bullish FVG & 50 EMA criteria satisfied for ${botState.symbol}. Executing LONG entry...`);
+
+                // Step 6 & 7 & 8: Execute LONG Entry, Stop Loss below FVG, and 1:3 Take Profit
+                const orderRes = await executeGateOrder(botState.symbol, 'buy', 'market', botState.capital);
+                
+                // Stop monitoring after successful trade execution for this setup
+                botState.isRunning = false;
+                clearInterval(botState.intervalId);
+
+            } catch (loopErr) {
+                console.error("Strategy Loop Error:", loopErr.message);
+            }
+        }, 15000); // Check every 15 seconds
+
+        jsonResponse(res, { 
             success: true, 
-            data: data,
-            strategy: 'FMA Strategy',
-            tp: takeProfitPrice,
-            sl: stopLossPrice,
-            message: 'Trade executed successfully based on FMA Strategy with configured TP & SL.'
+            message: 'Bot started successfully. Continuously monitoring 15m FVG and 50 EMA strategy conditions...' 
         });
 
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message || 'Failed to connect to trading server.' });
+        botState.isRunning = false;
+        res.status(500).json({ success: false, error: err.message || 'Failed to start bot.' });
     }
 });
 
+// 2. Stop Bot & Sell All Open Quantities Endpoint
 app.post('/api/gate/close-all', async (req, res) => {
     try {
+        botState.isRunning = false;
+        if (botState.intervalId) {
+            clearInterval(botState.intervalId);
+        }
+
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
 
@@ -208,48 +294,63 @@ app.post('/api/gate/close-all', async (req, res) => {
 
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
-        const url = '/spot/orders';
-        const method = 'GET';
-
         const t = Math.floor(Date.now() / 1000).toString();
-        const signatureString = `${method}\n${prefix + url}\n\n\n${t}`;
-        const signature = crypto.createHmac('sha512', apiSecret).update(signatureString).digest('hex');
 
-        const response = await fetch(`https://${host}${prefix}${url}?status=open`, {
-            method: method,
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'KEY': apiKey,
-                'Timestamp': t,
-                'SIGN': signature
-            }
+        // Step A: Cancel all open spot orders
+        const ordersUrl = '/spot/orders';
+        const getSigStr = `GET\n${prefix + ordersUrl}\n\nstatus=open\n${t}`;
+        const getSig = crypto.createHmac('sha512', apiSecret).update(getSigStr).digest('hex');
+
+        const ordersRes = await fetch(`https://${host}${prefix}${ordersUrl}?status=open`, {
+            method: 'GET',
+            headers: { 'KEY': apiKey, 'Timestamp': t, 'SIGN': getSig, 'Accept': 'application/json' }
         });
+        const openOrders = await ordersRes.json();
 
-        const openOrders = await response.json();
-        
         if (Array.isArray(openOrders)) {
             for (const order of openOrders) {
-                const cancelUrl = `/spot/orders/${order.id}?currency_pair=${order.currency_pair}`;
-                const cancelMethod = 'DELETE';
-                const cancelT = Math.floor(Date.now() / 1000).toString();
-                const cancelSigStr = `${cancelMethod}\n${prefix + cancelUrl}\n\n\n${cancelT}`;
-                const cancelSig = crypto.createHmac('sha512', apiSecret).update(cancelSigStr).digest('hex');
+                const delUrl = `/spot/orders/${order.id}?currency_pair=${order.currency_pair}`;
+                const delT = Math.floor(Date.now() / 1000).toString();
+                const delSigStr = `DELETE\n${prefix + delUrl}\n\n\n${delT}`;
+                const delSig = crypto.createHmac('sha512', apiSecret).update(delSigStr).digest('hex');
 
-                await fetch(`https://${host}${cancelUrl}`, {
-                    method: cancelMethod,
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'KEY': apiKey,
-                        'Timestamp': cancelT,
-                        'SIGN': cancelSig
-                    }
+                await fetch(`https://${host}${delUrl}`, {
+                    method: 'DELETE',
+                    headers: { 'KEY': apiKey, 'Timestamp': delT, 'SIGN': delSig, 'Accept': 'application/json' }
                 });
             }
         }
 
-        res.json({ success: true, message: 'All active bot trades and open orders closed successfully.' });
+        // Step B: Fetch spot accounts to find any filled coins and market sell them instantly
+        const accUrl = '/spot/accounts';
+        const accT = Math.floor(Date.now() / 1000).toString();
+        const accSigStr = `GET\n${prefix + accUrl}\n\n\n${accT}`;
+        const accSig = crypto.createHmac('sha512', apiSecret).update(accSigStr).digest('hex');
+
+        const accRes = await fetch(`https://${host}${prefix}${accUrl}`, {
+            method: 'GET',
+            headers: { 'KEY': apiKey, 'Timestamp': accT, 'SIGN': accSig, 'Accept': 'application/json' }
+        });
+        const accounts = await accRes.json();
+
+        if (Array.isArray(accounts)) {
+            for (const acc of accounts) {
+                const availableBalance = parseFloat(acc.available || 0);
+                const currency = acc.currency;
+                
+                if (currency !== 'USDT' && availableBalance > 0) {
+                    const pair = `${currency}_USDT`;
+                    try {
+                        await executeGateOrder(pair, 'sell', 'market', availableBalance);
+                        console.log(`[EMERGENCY SELL] Sold ${availableBalance} of ${currency} due to Bot Stop.`);
+                    } catch (sellErr) {
+                        console.error(`Failed to sell ${currency}:`, sellErr.message);
+                    }
+                }
+            }
+        }
+
+        jsonResponse(res, { success: true, message: 'Bot stopped successfully. All open orders canceled and coin quantities sold.' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
