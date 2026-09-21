@@ -103,10 +103,15 @@ app.post('/api/gate/trade', async (req, res) => {
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
-            type: oType,
-            amount: rawQty.toString(),
-            quote_amount: rawQty.toString()
+            type: oType
         };
+
+        // Correct parameter segregation for Gate.io API
+        if (oType === 'market' && sSide === 'buy') {
+            bodyObj.quote_amount = rawQty.toString(); // Spends exact USDT amount safely
+        } else {
+            bodyObj.amount = rawQty.toString();
+        }
 
         if (oType !== 'market') {
             bodyObj.price = combinedData.price ? combinedData.price.toString() : '0';
