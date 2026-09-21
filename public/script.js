@@ -64,7 +64,6 @@ function showStylishPopup(message, type = 'error') {
     popup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
     popup.style.backdropFilter = 'blur(10px)';
 
-    // Error message se "Bybit" ka lafz generic banane ke liye
     let cleanMessage = message ? message.replace(/Bybit/gi, 'Trading') : 'An error occurred.';
 
     if (type === 'error') {
@@ -141,15 +140,17 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
         terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA SIGNAL]</span> Executing backend secure trade...`;
         terminal.scrollTop = terminal.scrollHeight;
 
-        let tradeRes = await fetch('/api/bybit/trade', {
+        // Gate.io API integration endpoint and formatted symbol (e.g. BTC_USDT)[cite: 1]
+        let formattedSymbol = symbol.includes('_') ? symbol : symbol.replace('USDT', '_USDT');
+
+        let tradeRes = await fetch('/api/gate/trade', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                symbol,
-                side: 'Buy',
-                orderType: 'Market',
-                qty,
-                testnet: false
+                symbol: formattedSymbol,
+                side: 'buy',
+                orderType: 'market',
+                qty
             })
         });
 
@@ -251,7 +252,6 @@ window.startBot = function() {
     fmaBotActive = true;
     fmaSetupTriggered = false;
     
-    // Yahan se premature alert hata diya gaya hai taaki jab tak trade successfully execute na ho, success popup na aaye.
     const terminal = document.getElementById('terminal-logs');
     if (terminal) {
         terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot started with automated backend execution.`;
@@ -373,3 +373,6 @@ async function loadAdminSettings() {
         }
     } catch (e) {}
 }
+```[cite: 1]
+
+Aap is updated code ko apni `script.js` file mein save karke GitHub par push kar dein, ab aapka bot theek tareeqay se Gate.io API ke sath backend par kaam karega[cite: 1, 10, 11]!
