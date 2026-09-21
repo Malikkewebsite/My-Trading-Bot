@@ -23,7 +23,7 @@ const spotCoins = [
 
 let currentSymbol = 'BTCUSDT';
 let fmaBotActive = false;
-let fmaSetupTriggered = false; // Ensures only one trade per setup
+let fmaSetupTriggered = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     let uid = localStorage.getItem('bybit_user_uid');
@@ -47,11 +47,71 @@ document.addEventListener('DOMContentLoaded', () => {
         planBadge.className = 'plan-badge active';
     }
 
+    // Inject Bybit API Key inputs inside Config Panel if not present
+    injectBybitKeyInputs();
+
     loadTradingViewChart(currentSymbol);
     fetchLiveCoinPrice(currentSymbol);
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
     loadAdminSettings();
 });
+
+// --- STYLISH POPUP NOTIFICATION HANDLER ---
+function showStylishPopup(message, type = 'error') {
+    let existing = document.getElementById('custom-toast-popup');
+    if (existing) existing.remove();
+
+    let popup = document.createElement('div');
+    popup.id = 'custom-toast-popup';
+    popup.style.position = 'fixed';
+    popup.style.bottom = '25px';
+    popup.style.right = '25px';
+    popup.style.padding = '16px 22px';
+    popup.style.borderRadius = '12px';
+    popup.style.color = '#fff';
+    popup.style.fontWeight = '500';
+    popup.style.fontSize = '14px';
+    popup.style.zIndex = '99999';
+    popup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+    popup.style.transition = 'all 0.3s ease';
+    popup.style.backdropFilter = 'blur(10px)';
+
+    if (type === 'error') {
+        popup.style.background = 'linear-gradient(135deg, rgba(218, 54, 51, 0.95), rgba(248, 81, 73, 0.95))';
+        popup.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+        popup.innerHTML = `⚠️ <strong>Bybit Exchange Error:</strong><br>${message}`;
+    } else {
+        popup.style.background = 'linear-gradient(135deg, rgba(35, 134, 54, 0.95), rgba(46, 160, 67, 0.95))';
+        popup.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+        popup.innerHTML = `✅ <strong>Success:</strong><br>${message}`;
+    }
+
+    document.body.appendChild(popup);
+
+    setTimeout(() => {
+        popup.style.opacity = '0';
+        setTimeout(() => popup.remove(), 300);
+    }, 6000);
+}
+
+// Inject API key inputs into config panel dynamically
+function injectBybitKeyInputs() {
+    const configPanel = document.querySelector('.config-panel');
+    if (configPanel && !document.getElementById('bybit-apikey-input')) {
+        const div = document.createElement('div');
+        div.innerHTML = `
+            <div class="form-group" style="margin-top: 10px;">
+                <label>Bybit API Key</label>
+                <input type="password" id="bybit-apikey-input" placeholder="Enter Bybit API Key...">
+            </div>
+            <div class="form-group">
+                <label>Bybit API Secret</label>
+                <input type="password" id="bybit-apisecret-input" placeholder="Enter Bybit API Secret...">
+            </div>
+        `;
+        configPanel.insertBefore(div, configPanel.querySelector('.action-buttons'));
+    }
+}
 
 // --- TRADINGVIEW 15-MINUTE LIVE CHART WIDGET ---
 function loadTradingViewChart(symbol) {
@@ -62,7 +122,7 @@ function loadTradingViewChart(symbol) {
     new TradingView.widget({
         "autosize": true,
         "symbol": "BINANCE:" + symbol,
-        "interval": "15", // 15-Minute Timeframe strict
+        "interval": "15",
         "timezone": "Etc/UTC",
         "theme": "dark",
         "style": "1",
@@ -92,7 +152,6 @@ async function fetchLiveCoinPrice(symbol) {
             changeEl.innerText = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
             changeEl.style.color = change >= 0 ? '#3fb950' : '#f85149';
 
-            // If FMA Strategy is running, evaluate mechanical conditions continuously
             if (fmaBotActive) {
                 evaluateFMAStrategy(symbol, price);
             }
@@ -107,22 +166,14 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
 
     if (!strategyName.includes('FMA Strategy')) return;
 
-    if (fmaSetupTriggered) {
-        if (terminal && Math.random() < 0.2) {
-            terminal.innerHTML += `<br>[FMA BOT] Setup already executed for ${symbol}. Waiting for next clean structure...`;
-            terminal.scrollTop = terminal.scrollHeight;
-        }
-        return;
-    }
+    if (fmaSetupTriggered) return;
 
     try {
-        // Fetch 15-minute Klines (Candles) from Binance public API
         let res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=15m&limit=50`);
         let klines = await res.json();
 
         if (!klines || klines.length < 50) return;
 
-        // Parse Candles: [OpenTime, Open, High, Low, Close, Volume, ...]
         let candles = klines.map(k => ({
             open: parseFloat(k[1]),
             high: parseFloat(k[2]),
@@ -130,111 +181,87 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
             close: parseFloat(k[4])
         }));
 
-        // 1. Calculate 50 EMA on 15m timeframe
         let closingPrices = candles.map(c => c.close);
         let ema50 = calculateEMA(closingPrices, 50);
 
-        // 2. Automatically detect Valid Bullish Fair Value Gap (FVG)
-        // Bullish FVG Formula: Low of Candle[i] > High of Candle[i-2]
         let bullishFVGs = [];
         for (let i = 2; i < candles.length - 1; i++) {
             let c1_high = candles[i - 2].high;
             let c3_low = candles[i].low;
             if (c3_low > c1_high) {
-                bullishFVGs.push({
-                    top: c3_low,
-                    bottom: c1_high,
-                    index: i
-                });
+                bullishFVGs.push({ top: c3_low, bottom: c1_high, index: i });
             }
         }
 
-        if (bullishFVGs.length === 0) {
-            if (terminal && Math.random() < 0.3) {
-                terminal.innerHTML += `<br>[FMA BOT] No valid Bullish FVG detected on 15m for ${symbol}. Waiting...`;
-                terminal.scrollTop = terminal.scrollHeight;
-            }
-            return;
-        }
+        if (bullishFVGs.length === 0) return;
 
-        // Take the most recent active FVG
         let activeFVG = bullishFVGs[bullishFVGs.length - 1];
-
-        // 3. Check Condition A (FVG Touch) & Condition B (50 EMA Touch)
         let latestCandle = candles[candles.length - 1];
-        let prevCandle = candles[candles.length - 2];
 
-        // Condition A: Price touched FVG range [bottom, top]
         let fvgTouched = (latestCandle.low <= activeFVG.top && latestCandle.high >= activeFVG.bottom);
-
-        // Condition B: Price touched / interacted with 50 EMA
         let emaTouched = (latestCandle.low <= ema50 && latestCandle.high >= ema50) || 
                          (Math.abs(latestCandle.close - ema50) / ema50 < 0.003);
 
-        if (!fvgTouched && !emaTouched) {
-            return; // Neither touched, wait silently
-        }
+        if (!fvgTouched || !emaTouched) return;
 
-        if (fvgTouched && !emaTouched) {
-            if (terminal && Math.random() < 0.4) {
-                terminal.innerHTML += `<br>[FMA NO-TRADE] FVG touched at $${activeFVG.bottom.toFixed(2)}, but 50 EMA ($${ema50.toFixed(2)}) NOT touched. Waiting...`;
-                terminal.scrollTop = terminal.scrollHeight;
-            }
-            return;
-        }
-
-        if (!fvgTouched && emaTouched) {
-            if (terminal && Math.random() < 0.4) {
-                terminal.innerHTML += `<br>[FMA NO-TRADE] 50 EMA touched, but Bullish FVG NOT touched. Waiting...`;
-                terminal.scrollTop = terminal.scrollHeight;
-            }
-            return;
-        }
-
-        // Both Touched! Now check Bullish Confirmation Candle
         let isBullishCandle = latestCandle.close > latestCandle.open;
         let bodySize = Math.abs(latestCandle.close - latestCandle.open);
         let totalRange = latestCandle.high - latestCandle.low;
-        let hasRejectionWick = (latestCandle.open - latestCandle.low) > (bodySize * 0.5); // Lower wick rejection
-        let emaNotBroken = latestCandle.low >= (ema50 * 0.995); // EMA not meaningfully broken downwards
+        let hasRejectionWick = (latestCandle.open - latestCandle.low) > (bodySize * 0.5);
+        let emaNotBroken = latestCandle.low >= (ema50 * 0.995);
 
         if (fvgTouched && emaTouched && isBullishCandle && (hasRejectionWick || bodySize > totalRange * 0.4) && emaNotBroken) {
-            // 4. LONG ENTRY, SL, and 1:3 TP CALCULATIONS
             let entryPrice = latestCandle.close;
-            // Stop Loss placed below FVG
-            let stopLoss = activeFVG.bottom - (entryPrice * 0.002); 
-            let risk = entryPrice - stopLoss;
-
-            if (risk <= 0) return; // Safety check for valid R:R
-
-            // Fixed 1:3 Risk-to-Reward Ratio
-            let takeProfit = entryPrice + (risk * 3.0);
             let capital = parseFloat(document.getElementById('capital-input').value) || 500;
+            // Calculate quantity based on capital and entry price
+            let qty = parseFloat((capital / entryPrice).toFixed(3));
+            if (qty <= 0) qty = 1;
 
             fmaSetupTriggered = true;
             document.getElementById('active-trades-count').innerText = "1";
 
-            terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA LONG TRIGGERED]</span><br>` +
-                `• Symbol: ${symbol} (15m FMA)<br>` +
-                `• Entry Price: $${entryPrice.toFixed(2)}<br>` +
-                `• Stop Loss: $${stopLoss.toFixed(2)} (Below FVG)<br>` +
-                `• Take Profit (1:3 RR): $${takeProfit.toFixed(2)}<br>` +
-                `• Allocated Capital: $${capital}`;
+            terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA LONG TRIGGERED]</span> Executing real order on Bybit...`;
             terminal.scrollTop = terminal.scrollHeight;
 
-            alert(`🚀 FMA LONG Order Executed!\nCoin: ${symbol}\nEntry: $${entryPrice.toFixed(2)}\nSL: $${stopLoss.toFixed(2)}\nTP (1:3): $${takeProfit.toFixed(2)}`);
-        } else if (fvgTouched && emaTouched) {
-            if (terminal && Math.random() < 0.4) {
-                terminal.innerHTML += `<br>[FMA WAITING] Both FVG & 50 EMA touched, awaiting strong bullish confirmation candle...`;
-                terminal.scrollTop = terminal.scrollHeight;
+            // Execute Real Trade via Backend Bybit API Route
+            const apiKey = document.getElementById('bybit-apikey-input') ? document.getElementById('bybit-apikey-input').value.trim() : '';
+            const apiSecret = document.getElementById('bybit-apisecret-input') ? document.getElementById('bybit-apisecret-input').value.trim() : '';
+
+            try {
+                let tradeRes = await fetch('/api/bybit/trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apiKey,
+                        apiSecret,
+                        symbol,
+                        side: 'Buy',
+                        orderType: 'Market',
+                        qty,
+                        testnet: false
+                    })
+                });
+
+                let tradeData = await tradeRes.json();
+
+                if (!tradeData.success) {
+                    showStylishPopup(tradeData.error, 'error');
+                    terminal.innerHTML += `<br><span style="color:#f85149;">[BYBIT ERROR]</span> ${tradeData.error}`;
+                    terminal.scrollTop = terminal.scrollHeight;
+                } else {
+                    showStylishPopup(`LONG order successfully placed on Bybit for ${symbol} (${qty} units)!`, 'success');
+                    terminal.innerHTML += `<br><span style="color:#3fb950;">[BYBIT SUCCESS]</span> Order ID: ${tradeData.data.orderId || 'Executed'}`;
+                    terminal.scrollTop = terminal.scrollHeight;
+                }
+            } catch (err) {
+                showStylishPopup('Network error connecting to backend Bybit execution route.', 'error');
             }
         }
     } catch (err) {
-        console.log("FMA engine calculation error", err);
+        console.log("FMA engine error", err);
     }
 }
 
-// Helper function to calculate Exponential Moving Average (EMA)
 function calculateEMA(data, period) {
     let k = 2 / (period + 1);
     let ema = data[0];
@@ -244,7 +271,6 @@ function calculateEMA(data, period) {
     return ema;
 }
 
-// --- SEARCH COINS AUTOCOMPLETE DROPDOWN ---
 window.showCoinDropdown = function() {
     renderCoinList(spotCoins);
 };
@@ -272,7 +298,7 @@ function renderCoinList(coins) {
             currentSymbol = coin.symbol;
             document.getElementById('coin-search').value = coin.symbol;
             dropdown.classList.add('hidden');
-            fmaSetupTriggered = false; // Reset setup trigger on coin change
+            fmaSetupTriggered = false;
             loadTradingViewChart(currentSymbol);
             fetchLiveCoinPrice(currentSymbol);
         };
@@ -287,7 +313,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// --- TAB SWITCHING LOGIC ---
 window.switchTab = function(tabName) {
     document.querySelectorAll('.tab-section').forEach(section => {
         section.classList.add('hidden');
@@ -311,7 +336,6 @@ window.switchTab = function(tabName) {
     }
 };
 
-// --- TRADING BOT FUNCTIONS ---
 window.startBot = async function() {
     let strategy = document.getElementById('strategy-select').value;
     fmaBotActive = true;
@@ -319,7 +343,7 @@ window.startBot = async function() {
 
     const terminal = document.getElementById('terminal-logs');
     if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#58a6ff;">[SYSTEM] Bot started successfully with strategy: ${strategy} on ${currentSymbol} (15m timeframe).</span>`;
+        terminal.innerHTML += `<br><span style="color:#58a6ff;">[SYSTEM] Bot started with ${strategy} on ${currentSymbol} (15m). Real Bybit execution enabled.</span>`;
         terminal.scrollTop = terminal.scrollHeight;
     }
     alert(`Bot started successfully with ${strategy}!`);
@@ -340,7 +364,6 @@ window.clearLogs = function() {
     if (terminal) terminal.innerHTML = '[SYSTEM] Logs cleared. Ready for FMA strategy signals.';
 };
 
-// --- PASSCODE REDEMPTION ---
 window.redeemPasscode = async function() {
     let uid = localStorage.getItem('bybit_user_uid');
     let code = document.getElementById('passcode-input').value.trim();
@@ -373,7 +396,6 @@ window.selectPlan = function(tierName) {
     alert(`Please enter your passcode for the ${tierName}.`);
 };
 
-// --- FUND MANAGEMENT & ADMIN ---
 window.loadAdminSettings = async function() {
     try {
         let res = await fetch('/api/admin/settings');
