@@ -93,7 +93,7 @@ app.post('/api/gate/trade', async (req, res) => {
         }
 
         const parsedQty = Number(rawQty);
-        const finalQty = (isNaN(parsedQty) || parsedQty <= 0) ? 2 : parsedQty;
+        const finalQty = (isNaN(parsedQty) || parsedQty <= 0) ? 1 : parsedQty;
 
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
@@ -107,12 +107,14 @@ app.post('/api/gate/trade', async (req, res) => {
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
-            type: oType,
-            amount: finalQty.toString()
+            type: oType
         };
 
+        // Correct parameter mapping for Gate.io API v4
         if (oType === 'market' && sSide === 'buy') {
             bodyObj.quote_amount = finalQty.toString();
+        } else {
+            bodyObj.amount = finalQty.toString();
         }
 
         if (oType !== 'market') {
