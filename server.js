@@ -17,7 +17,6 @@ let usersCount = 1;
 
 // --- BYBIT REAL EXCHANGE ORDER EXECUTION ROUTE ---
 app.post('/api/bybit/trade', async (req, res) => {
-    // Fallback to embedded keys if frontend didn't send them
     const apiKey = req.body.apiKey || 'eZKaZBvZ02FENX5Jd';
     const apiSecret = req.body.apiSecret || 'TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw';
     const { symbol, side, orderType, qty, price, testnet } = req.body;
@@ -34,8 +33,8 @@ app.post('/api/bybit/trade', async (req, res) => {
     const payload = {
         category: 'spot',
         symbol: symbol,
-        side: side, // 'Buy' or 'Sell'
-        orderType: orderType, // 'Market' or 'Limit'
+        side: side,
+        orderType: orderType,
         qty: qty.toString(),
         price: price ? price.toString() : undefined
     };
@@ -77,7 +76,6 @@ app.post('/api/bybit/trade', async (req, res) => {
     }
 });
 
-// Admin & App Routes
 app.get('/api/admin/settings', (req, res) => res.json(adminSettings));
 app.post('/api/admin/settings', (req, res) => {
     adminSettings = req.body;
