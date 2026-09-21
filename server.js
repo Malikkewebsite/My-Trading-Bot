@@ -88,12 +88,7 @@ app.post('/api/gate/trade', async (req, res) => {
 
         let rawQty = findAmount(combinedData);
         if (rawQty === null || isNaN(rawQty) || rawQty <= 0) {
-            rawQty = 1; 
-        }
-
-        // Balance aur fees ke masle se bachne ke liye agar amount 1.9 ya 2 se zyada ho toh safe limit set karein
-        if (rawQty > 1.2) {
-            rawQty = 1.2; 
+            rawQty = 3; // Minimum safe default set to 3 USDT
         }
 
         const host = 'api.gateio.ws';
@@ -105,7 +100,6 @@ app.post('/api/gate/trade', async (req, res) => {
         const sSide = combinedData.side ? combinedData.side.toLowerCase() : 'buy';
         const symbol = combinedData.symbol || 'DOGE_USDT';
 
-        // Gate.io ki strict validation ke liye amount aur quote_amount dono bhejna zaroori hai
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
