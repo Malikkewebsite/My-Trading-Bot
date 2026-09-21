@@ -91,7 +91,6 @@ app.post('/api/gate/trade', async (req, res) => {
             rawQty = 3; 
         }
 
-        // Gate.io ki minimum limit 3 USDT hai
         if (rawQty < 3) {
             rawQty = 3;
         }
@@ -111,7 +110,6 @@ app.post('/api/gate/trade', async (req, res) => {
             type: oType
         };
 
-        // Yahan par hum check karte hain ke market buy hai ya nahi, aur sirf zaroori parameter bhejte hain
         if (oType === 'market' && sSide === 'buy') {
             bodyObj.quote_amount = rawQty.toString();
         } else {
@@ -162,7 +160,7 @@ app.post('/api/gate/trade', async (req, res) => {
         }
 
         res.json({ success: true, data: data });
-    }caught (err) {
+    } catch (err) {
         res.status(500).json({ success: false, error: err.message || 'Failed to connect to trading server.' });
     }
 });
