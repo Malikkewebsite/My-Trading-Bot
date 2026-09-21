@@ -16,7 +16,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Bybit Trade Route
+// Trade Route
 app.post('/api/bybit/trade', async (req, res) => {
     try {
         const { symbol, side, orderType, qty, price, testnet } = req.body;
@@ -25,7 +25,7 @@ app.post('/api/bybit/trade', async (req, res) => {
         const apiSecret = DEFAULT_BYBIT_SECRET;
 
         if (!apiKey || !apiSecret) {
-            return res.status(400).json({ success: false, error: 'Environment variables BYBIT_API_KEY or BYBIT_API_SECRET are missing.' });
+            return res.status(400).json({ success: false, error: 'Environment variables API keys are missing.' });
         }
 
         const baseUrl = testnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
@@ -67,17 +67,17 @@ app.post('/api/bybit/trade', async (req, res) => {
         } catch (parseErr) {
             return res.status(500).json({ 
                 success: false, 
-                error: 'Invalid JSON response from Bybit server. Check network or API credentials.' 
+                error: 'Invalid JSON response from exchange server. Check network or API credentials.' 
             });
         }
 
         if (data.retCode !== 0) {
-            return res.status(400).json({ success: false, error: `Bybit Error (${data.retCode}): ${data.retMsg}` });
+            return res.status(400).json({ success: false, error: `Trading Error (${data.retCode}): ${data.retMsg}` });
         }
 
         res.json({ success: true, data: data.result });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message || 'Failed to connect to Bybit server.' });
+        res.status(500).json({ success: false, error: err.message || 'Failed to connect to trading server.' });
     }
 });
 
