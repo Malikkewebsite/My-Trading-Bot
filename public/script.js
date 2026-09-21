@@ -64,12 +64,15 @@ function showStylishPopup(message, type = 'error') {
     popup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
     popup.style.backdropFilter = 'blur(10px)';
 
+    // Error message se "Bybit" ka lafz generic banane ke liye
+    let cleanMessage = message ? message.replace(/Bybit/gi, 'Trading') : 'An error occurred.';
+
     if (type === 'error') {
         popup.style.background = 'linear-gradient(135deg, rgba(218, 54, 51, 0.95), rgba(248, 81, 73, 0.95))';
-        popup.innerHTML = `⚠️ <strong>Error:</strong><br>${message}`;
+        popup.innerHTML = `⚠️ <strong>Error:</strong><br>${cleanMessage}`;
     } else {
         popup.style.background = 'linear-gradient(135deg, rgba(35, 134, 54, 0.95), rgba(46, 160, 67, 0.95))';
-        popup.innerHTML = `✅ <strong>Success:</strong><br>${message}`;
+        popup.innerHTML = `✅ <strong>Success:</strong><br>${cleanMessage}`;
     }
 
     document.body.appendChild(popup);
@@ -152,15 +155,18 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
 
         let tradeData = await tradeRes.json();
         if (!tradeData.success) {
-            showStylishPopup(tradeData.error, 'error');
-            terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${tradeData.error}`;
+            let errorText = tradeData.error ? tradeData.error.replace(/Bybit/gi, 'Trading') : 'Trade execution failed.';
+            showStylishPopup(errorText, 'error');
+            terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${errorText}`;
         } else {
             showStylishPopup(`LONG order successfully placed via backend for ${symbol}!`, 'success');
             terminal.innerHTML += `<br><span style="color:#3fb950;">[SUCCESS]</span> Trade executed automatically.`;
         }
         terminal.scrollTop = terminal.scrollHeight;
     } catch (err) {
-        showStylishPopup('Network error connecting to backend execution route.', 'error');
+        let errText = err.message ? err.message.replace(/Bybit/gi, 'Trading') : 'Network error connecting to backend execution route.';
+        showStylishPopup(errText, 'error');
+        terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${errText}`;
     }
 }
 
@@ -244,7 +250,13 @@ window.switchAdminTab = function(subTab) {
 window.startBot = function() {
     fmaBotActive = true;
     fmaSetupTriggered = false;
-    alert('Bot started successfully with backend automated execution!');
+    
+    // Yahan se premature alert hata diya gaya hai taaki jab tak trade successfully execute na ho, success popup na aaye.
+    const terminal = document.getElementById('terminal-logs');
+    if (terminal) {
+        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot started with automated backend execution.`;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
 };
 
 window.stopBot = function() {
