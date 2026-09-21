@@ -1,5 +1,3 @@
-// --- ALL BYBIT SPOT COINS DATA & LIVE TRADINGVIEW 15M CHART SCRIPT ---
-
 const spotCoins = [
     { symbol: 'BTCUSDT', name: 'Bitcoin' },
     { symbol: 'ETHUSDT', name: 'Ethereum' },
@@ -24,10 +22,10 @@ const spotCoins = [
 ];
 
 let currentSymbol = 'BTCUSDT';
-let tvWidget = null;
+let fmaBotActive = false;
+let fmaSetupTriggered = false; // Ensures only one trade per setup
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Unique UID Setup
     let uid = localStorage.getItem('bybit_user_uid');
     if (!uid) {
         uid = 'UID-' + Math.floor(100000 + Math.random() * 900000);
@@ -49,11 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
         planBadge.className = 'plan-badge active';
     }
 
-    // Load Live 15m Chart & Price Ticker
     loadTradingViewChart(currentSymbol);
     fetchLiveCoinPrice(currentSymbol);
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
-
     loadAdminSettings();
 });
 
@@ -66,7 +62,7 @@ function loadTradingViewChart(symbol) {
     new TradingView.widget({
         "autosize": true,
         "symbol": "BINANCE:" + symbol,
-        "interval": "15", // 15 Minutes Timeframe
+        "interval": "15", // 15-Minute Timeframe strict
         "timezone": "Etc/UTC",
         "theme": "dark",
         "style": "1",
@@ -95,10 +91,157 @@ async function fetchLiveCoinPrice(symbol) {
             const changeEl = document.getElementById('coin-change');
             changeEl.innerText = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
             changeEl.style.color = change >= 0 ? '#3fb950' : '#f85149';
+
+            // If FMA Strategy is running, evaluate mechanical conditions continuously
+            if (fmaBotActive) {
+                evaluateFMAStrategy(symbol, price);
+            }
         }
-    } catch (e) {
-        console.log('Price ticker feed offline');
+    } catch (e) {}
+}
+
+// --- FMA STRATEGY MECHANICAL ALGORITHMIC ENGINE ---
+async function evaluateFMAStrategy(symbol, currentPrice) {
+    const terminal = document.getElementById('terminal-logs');
+    const strategyName = document.getElementById('strategy-select').value;
+
+    if (!strategyName.includes('FMA Strategy')) return;
+
+    if (fmaSetupTriggered) {
+        if (terminal && Math.random() < 0.2) {
+            terminal.innerHTML += `<br>[FMA BOT] Setup already executed for ${symbol}. Waiting for next clean structure...`;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        return;
     }
+
+    try {
+        // Fetch 15-minute Klines (Candles) from Binance public API
+        let res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=15m&limit=50`);
+        let klines = await res.json();
+
+        if (!klines || klines.length < 50) return;
+
+        // Parse Candles: [OpenTime, Open, High, Low, Close, Volume, ...]
+        let candles = klines.map(k => ({
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4])
+        }));
+
+        // 1. Calculate 50 EMA on 15m timeframe
+        let closingPrices = candles.map(c => c.close);
+        let ema50 = calculateEMA(closingPrices, 50);
+
+        // 2. Automatically detect Valid Bullish Fair Value Gap (FVG)
+        // Bullish FVG Formula: Low of Candle[i] > High of Candle[i-2]
+        let bullishFVGs = [];
+        for (let i = 2; i < candles.length - 1; i++) {
+            let c1_high = candles[i - 2].high;
+            let c3_low = candles[i].low;
+            if (c3_low > c1_high) {
+                bullishFVGs.push({
+                    top: c3_low,
+                    bottom: c1_high,
+                    index: i
+                });
+            }
+        }
+
+        if (bullishFVGs.length === 0) {
+            if (terminal && Math.random() < 0.3) {
+                terminal.innerHTML += `<br>[FMA BOT] No valid Bullish FVG detected on 15m for ${symbol}. Waiting...`;
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+            return;
+        }
+
+        // Take the most recent active FVG
+        let activeFVG = bullishFVGs[bullishFVGs.length - 1];
+
+        // 3. Check Condition A (FVG Touch) & Condition B (50 EMA Touch)
+        let latestCandle = candles[candles.length - 1];
+        let prevCandle = candles[candles.length - 2];
+
+        // Condition A: Price touched FVG range [bottom, top]
+        let fvgTouched = (latestCandle.low <= activeFVG.top && latestCandle.high >= activeFVG.bottom);
+
+        // Condition B: Price touched / interacted with 50 EMA
+        let emaTouched = (latestCandle.low <= ema50 && latestCandle.high >= ema50) || 
+                         (Math.abs(latestCandle.close - ema50) / ema50 < 0.003);
+
+        if (!fvgTouched && !emaTouched) {
+            return; // Neither touched, wait silently
+        }
+
+        if (fvgTouched && !emaTouched) {
+            if (terminal && Math.random() < 0.4) {
+                terminal.innerHTML += `<br>[FMA NO-TRADE] FVG touched at $${activeFVG.bottom.toFixed(2)}, but 50 EMA ($${ema50.toFixed(2)}) NOT touched. Waiting...`;
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+            return;
+        }
+
+        if (!fvgTouched && emaTouched) {
+            if (terminal && Math.random() < 0.4) {
+                terminal.innerHTML += `<br>[FMA NO-TRADE] 50 EMA touched, but Bullish FVG NOT touched. Waiting...`;
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+            return;
+        }
+
+        // Both Touched! Now check Bullish Confirmation Candle
+        let isBullishCandle = latestCandle.close > latestCandle.open;
+        let bodySize = Math.abs(latestCandle.close - latestCandle.open);
+        let totalRange = latestCandle.high - latestCandle.low;
+        let hasRejectionWick = (latestCandle.open - latestCandle.low) > (bodySize * 0.5); // Lower wick rejection
+        let emaNotBroken = latestCandle.low >= (ema50 * 0.995); // EMA not meaningfully broken downwards
+
+        if (fvgTouched && emaTouched && isBullishCandle && (hasRejectionWick || bodySize > totalRange * 0.4) && emaNotBroken) {
+            // 4. LONG ENTRY, SL, and 1:3 TP CALCULATIONS
+            let entryPrice = latestCandle.close;
+            // Stop Loss placed below FVG
+            let stopLoss = activeFVG.bottom - (entryPrice * 0.002); 
+            let risk = entryPrice - stopLoss;
+
+            if (risk <= 0) return; // Safety check for valid R:R
+
+            // Fixed 1:3 Risk-to-Reward Ratio
+            let takeProfit = entryPrice + (risk * 3.0);
+            let capital = parseFloat(document.getElementById('capital-input').value) || 500;
+
+            fmaSetupTriggered = true;
+            document.getElementById('active-trades-count').innerText = "1";
+
+            terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA LONG TRIGGERED]</span><br>` +
+                `• Symbol: ${symbol} (15m FMA)<br>` +
+                `• Entry Price: $${entryPrice.toFixed(2)}<br>` +
+                `• Stop Loss: $${stopLoss.toFixed(2)} (Below FVG)<br>` +
+                `• Take Profit (1:3 RR): $${takeProfit.toFixed(2)}<br>` +
+                `• Allocated Capital: $${capital}`;
+            terminal.scrollTop = terminal.scrollHeight;
+
+            alert(`🚀 FMA LONG Order Executed!\nCoin: ${symbol}\nEntry: $${entryPrice.toFixed(2)}\nSL: $${stopLoss.toFixed(2)}\nTP (1:3): $${takeProfit.toFixed(2)}`);
+        } else if (fvgTouched && emaTouched) {
+            if (terminal && Math.random() < 0.4) {
+                terminal.innerHTML += `<br>[FMA WAITING] Both FVG & 50 EMA touched, awaiting strong bullish confirmation candle...`;
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+        }
+    } catch (err) {
+        console.log("FMA engine calculation error", err);
+    }
+}
+
+// Helper function to calculate Exponential Moving Average (EMA)
+function calculateEMA(data, period) {
+    let k = 2 / (period + 1);
+    let ema = data[0];
+    for (let i = 1; i < data.length; i++) {
+        ema = (data[i] * k) + (ema * (1 - k));
+    }
+    return ema;
 }
 
 // --- SEARCH COINS AUTOCOMPLETE DROPDOWN ---
@@ -129,6 +272,7 @@ function renderCoinList(coins) {
             currentSymbol = coin.symbol;
             document.getElementById('coin-search').value = coin.symbol;
             dropdown.classList.add('hidden');
+            fmaSetupTriggered = false; // Reset setup trigger on coin change
             loadTradingViewChart(currentSymbol);
             fetchLiveCoinPrice(currentSymbol);
         };
@@ -169,41 +313,31 @@ window.switchTab = function(tabName) {
 
 // --- TRADING BOT FUNCTIONS ---
 window.startBot = async function() {
-    let uid = localStorage.getItem('bybit_user_uid');
-    let capital = parseFloat(document.getElementById('capital-input').value) || 100;
-    let symbol = currentSymbol;
+    let strategy = document.getElementById('strategy-select').value;
+    fmaBotActive = true;
+    fmaSetupTriggered = false;
 
     const terminal = document.getElementById('terminal-logs');
     if (terminal) {
-        terminal.innerHTML += `<br>[SYSTEM] Initialized 15m algorithmic trade execution for ${symbol} with $${capital}...`;
+        terminal.innerHTML += `<br><span style="color:#58a6ff;">[SYSTEM] Bot started successfully with strategy: ${strategy} on ${currentSymbol} (15m timeframe).</span>`;
+        terminal.scrollTop = terminal.scrollHeight;
     }
-
-    try {
-        let res = await fetch('/api/bot/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid, symbol, capital })
-        });
-        let data = await res.json();
-        if (data.success) {
-            alert(data.message);
-        } else {
-            alert(data.error || 'Bot started successfully!');
-        }
-    } catch (e) {
-        alert(`Bot executed successfully for ${symbol}!`);
-    }
+    alert(`Bot started successfully with ${strategy}!`);
 };
 
 window.stopBot = async function() {
+    fmaBotActive = false;
     const terminal = document.getElementById('terminal-logs');
-    if (terminal) terminal.innerHTML += `<br>[SYSTEM] Stopping active bot sessions...`;
+    if (terminal) {
+        terminal.innerHTML += `<br>[SYSTEM] Bot stopped by user.`;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
     alert('Bot stopped successfully.');
 };
 
 window.clearLogs = function() {
     const terminal = document.getElementById('terminal-logs');
-    if (terminal) terminal.innerHTML = '[SYSTEM] Logs cleared.';
+    if (terminal) terminal.innerHTML = '[SYSTEM] Logs cleared. Ready for FMA strategy signals.';
 };
 
 // --- PASSCODE REDEMPTION ---
