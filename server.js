@@ -9,7 +9,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let adminSettings = {
     usdtAddress: 'TRC20_OFFICIAL_WALLET_ADDRESS_HERE',
-    easypaisaNumber: '03001234567 (Official Easypaisa)'
+    easypaisaNumber: '03125124424 (Official Easypaisa)'
 };
 let accessCodes = {};
 let transactions = [];
@@ -17,12 +17,10 @@ let usersCount = 1;
 
 // --- BYBIT REAL EXCHANGE ORDER EXECUTION ROUTE ---
 app.post('/api/bybit/trade', async (req, res) => {
-    const apiKey = req.body.apiKey || 'eZKaZBvZ02FENX5Jd';
-    const apiSecret = req.body.apiSecret || 'TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw';
-    const { symbol, side, orderType, qty, price, testnet } = req.body;
+    const { apiKey, apiSecret, symbol, side, orderType, qty, price, testnet } = req.body;
 
     if (!apiKey || !apiSecret) {
-        return res.status(400).json({ success: false, error: 'Bybit API Key and Secret are required.' });
+        return res.status(400).json({ success: false, error: 'Bybit API Key and Secret are required in settings.' });
     }
 
     const baseUrl = testnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
@@ -58,7 +56,16 @@ app.post('/api/bybit/trade', async (req, res) => {
             body: bodyString
         });
 
-        const data = await response.json();
+        const textResponse = await response.text();
+        let data;
+        try {
+            data = JSON.parse(textResponse);
+        } catch (e) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid JSON response from Bybit: ${textResponse.substring(0, 100)}`
+            });
+        }
 
         if (data.retCode !== 0) {
             return res.status(400).json({
