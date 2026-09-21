@@ -47,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
         planBadge.className = 'plan-badge active';
     }
 
-    // Inject Bybit API Key inputs inside Config Panel if not present
     injectBybitKeyInputs();
 
     loadTradingViewChart(currentSymbol);
@@ -94,7 +93,7 @@ function showStylishPopup(message, type = 'error') {
     }, 6000);
 }
 
-// Inject API key inputs into config panel dynamically
+// Inject API key inputs with pre-filled default values
 function injectBybitKeyInputs() {
     const configPanel = document.querySelector('.config-panel');
     if (configPanel && !document.getElementById('bybit-apikey-input')) {
@@ -102,11 +101,11 @@ function injectBybitKeyInputs() {
         div.innerHTML = `
             <div class="form-group" style="margin-top: 10px;">
                 <label>Bybit API Key</label>
-                <input type="password" id="bybit-apikey-input" placeholder="Enter Bybit API Key...">
+                <input type="password" id="bybit-apikey-input" value="eZKaZBvZ02FENX5Jd" placeholder="Enter Bybit API Key...">
             </div>
             <div class="form-group">
                 <label>Bybit API Secret</label>
-                <input type="password" id="bybit-apisecret-input" placeholder="Enter Bybit API Secret...">
+                <input type="password" id="bybit-apisecret-input" value="TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw" placeholder="Enter Bybit API Secret...">
             </div>
         `;
         configPanel.insertBefore(div, configPanel.querySelector('.action-buttons'));
@@ -165,7 +164,6 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
     const strategyName = document.getElementById('strategy-select').value;
 
     if (!strategyName.includes('FMA Strategy')) return;
-
     if (fmaSetupTriggered) return;
 
     try {
@@ -213,7 +211,6 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
         if (fvgTouched && emaTouched && isBullishCandle && (hasRejectionWick || bodySize > totalRange * 0.4) && emaNotBroken) {
             let entryPrice = latestCandle.close;
             let capital = parseFloat(document.getElementById('capital-input').value) || 500;
-            // Calculate quantity based on capital and entry price
             let qty = parseFloat((capital / entryPrice).toFixed(3));
             if (qty <= 0) qty = 1;
 
@@ -223,9 +220,8 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
             terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA LONG TRIGGERED]</span> Executing real order on Bybit...`;
             terminal.scrollTop = terminal.scrollHeight;
 
-            // Execute Real Trade via Backend Bybit API Route
-            const apiKey = document.getElementById('bybit-apikey-input') ? document.getElementById('bybit-apikey-input').value.trim() : '';
-            const apiSecret = document.getElementById('bybit-apisecret-input') ? document.getElementById('bybit-apisecret-input').value.trim() : '';
+            const apiKey = document.getElementById('bybit-apikey-input') ? document.getElementById('bybit-apikey-input'].value.trim() : 'eZKaZBvZ02FENX5Jd';
+            const apiSecret = document.getElementById('bybit-apisecret-input') ? document.getElementById('bybit-apisecret-input'].value.trim() : 'TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw';
 
             try {
                 let tradeRes = await fetch('/api/bybit/trade', {
