@@ -4,6 +4,7 @@ const path = require('path');
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Safe static file serving
 try {
@@ -41,7 +42,7 @@ app.get('/api/deposit/info', (req, res) => {
 
 // Admin Passcode generation route to fix passcode issue
 app.post('/api/admin/passcode', (req, res) => {
-    const { plan } = req.body;
+    const { plan } = req.body || {};
     const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
     res.json({
         success: true,
@@ -61,8 +62,8 @@ app.post('/api/admin/generate', (req, res) => {
 // Gate.io Trade Route
 app.post('/api/gate/trade', async (req, res) => {
     try {
-        console.log("Incoming Trade Request Body:", req.body);
-        const bodyData = req.body || {};
+        const combinedData = { ...(req.query || {}), ...(req.body || {}) };
+        console.log("Incoming Trade Request Data:", combinedData);
 
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
@@ -71,20 +72,19 @@ app.post('/api/gate/trade', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Environment variables API keys are missing.' });
         }
 
-        // Exhaustive fallback: check every possible property name the frontend might send
-        let rawQty = bodyData.qty ?? 
-                     bodyData.amount ?? 
-                     bodyData.capital ?? 
-                     bodyData.size ?? 
-                     bodyData.capitalAllocation ?? 
-                     bodyData.capital_allocation ?? 
-                     bodyData.allocation ?? 
-                     bodyData.usdt ?? 
-                     bodyData.value;
+        // Exhaustive fallback to capture amount/capital/qty from any source
+        let rawQty = combinedData.qty ?? 
+                     combinedData.amount ?? 
+                     combinedData.capital ?? 
+                     combinedData.size ?? 
+                     combinedData.capitalAllocation ?? 
+                     combinedData.capital_allocation ?? 
+                     combinedData.allocation ?? 
+                     combinedData.usdt ?? 
+                     combinedData.value;
 
-        // Ultimate fallback: if no known key matches, search all values in the request body for a valid number
-        if (rawQty === undefined || rawQty === null || rawQty === '') {
-            for (const val of Object.values(bodyData)) {
+        if (rawQty === undefined || rawQty === null || rawQty === '' || isNaN(Number(rawQty))) {
+            for (const val of Object.values(combinedData)) {
                 if (typeof val === 'number' || (typeof val === 'string' && !isNaN(val) && val.trim() !== '')) {
                     rawQty = val;
                     break;
@@ -100,9 +100,9 @@ app.post('/api/gate/trade', async (req, res) => {
         const url = '/spot/orders';
         const method = 'POST';
 
-        const oType = bodyData.orderType ? bodyData.orderType.toLowerCase() : 'market';
-        const sSide = bodyData.side ? bodyData.side.toLowerCase() : 'buy';
-        const symbol = bodyData.symbol || 'DOGE_USDT';
+        const oType = combinedData.orderType ? combinedData.orderType.toLowerCase() : 'market';
+        const sSide = combinedData.side ? combinedData.side.toLowerCase() : 'buy';
+        const symbol = combinedData.symbol || 'DOGE_USDT';
 
         const bodyObj = {
             currency_pair: symbol, 
@@ -110,7 +110,6 @@ app.post('/api/gate/trade', async (req, res) => {
             type: oType
         };
 
-        // For Market Buy, use quote_amount (USDT value), otherwise use amount (coin quantity)
         if (oType === 'market' && sSide === 'buy') {
             bodyObj.quote_amount = finalQty.toString();
         } else {
@@ -118,7 +117,7 @@ app.post('/api/gate/trade', async (req, res) => {
         }
 
         if (oType !== 'market') {
-            bodyObj.price = bodyData.price ? bodyData.price.toString() : '0';
+            bodyObj.price = combinedData.price ? combinedData.price.toString() : '0';
         } else {
             bodyObj.time_in_force = 'ioc';
         }
