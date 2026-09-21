@@ -145,7 +145,7 @@ app.post('/api/gate/trade', async (req, res) => {
         }
 
         res.json({ success: true, data: data });
-    }CVcatch (err) {
+    } catch (err) {
         res.status(500).json({ success: false, error: err.message || 'Failed to connect to trading server.' });
     }
 });
