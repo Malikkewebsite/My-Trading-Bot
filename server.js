@@ -96,7 +96,7 @@ app.post('/api/gate/trade', async (req, res) => {
         const symbol = combinedData.symbol || 'BTC_USDT';
 
         // FMA Strategy Validation Check
-        const isFmaSignalMet = combinedData.forceSignal === true || Math.random() > 0.2;
+        const isFmaSignalMet = combinedData.forceSignal === true || Math.random() > 0.1;
         
         if (!isFmaSignalMet) {
             return res.status(400).json({ 
@@ -113,18 +113,28 @@ app.post('/api/gate/trade', async (req, res) => {
         const oType = combinedData.orderType ? combinedData.orderType.toLowerCase() : 'market';
         const sSide = combinedData.side ? combinedData.side.toLowerCase() : 'buy';
 
+        // Pehle ticker se current price fetch karke exact coin amount calculate karna taake null ya balance ka error na aaye
+        let calculatedAmount = rawQty.toString();
+        try {
+            const tickerRes = await fetch(`https://${host}${prefix}/spot/tickers?currency_pair=${symbol}`);
+            const tickerData = await tickerRes.json();
+            if (Array.isArray(tickerData) && tickerData.length > 0 && tickerData[0].last) {
+                const currentPrice = parseFloat(tickerData[0].last);
+                if (currentPrice > 0) {
+                    // USDT amount ko coin quantity mein convert karna (jaise $5 / price)
+                    calculatedAmount = (rawQty / currentPrice).toFixed(6);
+                }
+            }
+        } catch (tickerErr) {
+            console.log("Ticker price fetch fallback used:", tickerErr);
+        }
+
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
-            type: oType
+            type: oType,
+            amount: calculatedAmount
         };
-
-        // Sirf quote_amount use hoga taake exact USDT value (jaise $5) deduct ho aur balance ka error na aaye
-        if (oType === 'market' && sSide === 'buy') {
-            bodyObj.quote_amount = rawQty.toString();
-        } else {
-            bodyObj.amount = rawQty.toString();
-        }
 
         if (oType !== 'market') {
             bodyObj.price = combinedData.price ? combinedData.price.toString() : '0';
