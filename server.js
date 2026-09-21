@@ -104,17 +104,13 @@ app.post('/api/gate/trade', async (req, res) => {
         const sSide = combinedData.side ? combinedData.side.toLowerCase() : 'buy';
         const symbol = combinedData.symbol || 'DOGE_USDT';
 
+        // Yahan amount field ko laazmi tor par bhej rahe hain taake null ka error na aaye
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
-            type: oType
+            type: oType,
+            amount: rawQty.toString()
         };
-
-        if (oType === 'market' && sSide === 'buy') {
-            bodyObj.quote_amount = rawQty.toString();
-        } else {
-            bodyObj.amount = rawQty.toString();
-        }
 
         if (oType !== 'market') {
             bodyObj.price = combinedData.price ? combinedData.price.toString() : '0';
