@@ -85,6 +85,9 @@ app.post('/api/gate/trade', async (req, res) => {
 
         if (oType !== 'market') {
             bodyObj.price = price ? price.toString() : '0';
+        } else {
+            // Market order ke liye ioc dena zaroori hai taake gtc ka error na aaye
+            bodyObj.time_in_force = 'ioc';
         }
 
         const bodyString = JSON.stringify(bodyObj);
