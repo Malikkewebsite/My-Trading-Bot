@@ -5,15 +5,23 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-// Serve static frontend files from the 'public' folder
-app.use(express.static(path.join(__dirname, 'public')));
+// Safe static file serving
+try {
+    app.use(express.static(path.join(__dirname, 'public')));
+} catch (e) {
+    console.error("Static folder error:", e);
+}
 
 const DEFAULT_GATE_KEY = process.env.GATE_API_KEY;
 const DEFAULT_GATE_SECRET = process.env.GATE_API_SECRET;
 
-// Root route to serve index.html from public folder
+// Root route with error handling
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    try {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    } catch (err) {
+        res.status(500).send('Frontend index.html not found.');
+    }
 });
 
 // Gate.io Trade Route
@@ -33,7 +41,6 @@ app.post('/api/gate/trade', async (req, res) => {
         const url = '/spot/orders';
         const method = 'POST';
 
-        // Gate.io order payload format (Fixed for market orders to avoid TimeInForce error)
         const oType = orderType ? orderType.toLowerCase() : 'market';
         const bodyObj = {
             currency_pair: symbol, 
@@ -42,14 +49,12 @@ app.post('/api/gate/trade', async (req, res) => {
             amount: qty.toString()
         };
 
-        // Only include price if it's a limit order
         if (oType !== 'market') {
             bodyObj.price = price ? price.toString() : '0';
         }
 
         const bodyString = JSON.stringify(bodyObj);
 
-        // Gate.io V4 API Signature Generation
         const hashedPayload = crypto.createHash('sha512').update(bodyString).digest('hex');
         const t = Math.floor(Date.now() / 1000).toString();
 
@@ -100,6 +105,3 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 module.exports = app;
-```[cite: 13]
-
-Aap is code ko apni file mein paste karke save karein aur GitHub par push/redeploy kar dein, ab bot bina kisi error ke foran market order execute kar lega!
