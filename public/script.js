@@ -16,28 +16,36 @@ let fmaBotActive = false;
 let fmaSetupTriggered = false;
 
 document.addEventListener('DOMContentLoaded', () => {
-    let uid = localStorage.getItem('bybit_user_uid');
-    if (!uid) {
-        uid = 'UID-' + Math.floor(100000 + Math.random() * 900000);
-        localStorage.setItem('bybit_user_uid', uid);
-    }
+    try {
+        let uid = localStorage.getItem('bybit_user_uid');
+        if (!uid) {
+            uid = 'UID-' + Math.floor(100000 + Math.random() * 900000);
+            localStorage.setItem('bybit_user_uid', uid);
+        }
 
-    const uidBadge = document.getElementById('user-uid-badge');
-    if (uidBadge) uidBadge.innerText = `UID: ${uid}`;
-    if (document.getElementById('admin-uid-text')) document.getElementById('admin-uid-text').innerText = uid;
+        const uidBadge = document.getElementById('user-uid-badge');
+        if (uidBadge) uidBadge.innerText = `UID: ${uid}`;
+        
+        const adminUidText = document.getElementById('admin-uid-text');
+        if (adminUidText) adminUidText.innerText = uid;
 
-    let localBalance = parseFloat(localStorage.getItem('bybit_balance')) || 500.00;
-    let localPlan = localStorage.getItem('bybit_plan') || null;
+        let localBalance = parseFloat(localStorage.getItem('bybit_balance')) || 500.00;
+        let localPlan = localStorage.getItem('bybit_plan') || null;
 
-    const balanceEl = document.getElementById('header-balance');
-    if (balanceEl) balanceEl.innerText = `$${localBalance.toFixed(2)}`;
-    if (document.getElementById('admin-wallet-bal')) document.getElementById('admin-wallet-bal').innerText = `$${localBalance.toFixed(2)}`;
+        const balanceEl = document.getElementById('header-balance');
+        if (balanceEl) balanceEl.innerText = `$${localBalance.toFixed(2)}`;
+        
+        const adminWalletBal = document.getElementById('admin-wallet-bal');
+        if (adminWalletBal) adminWalletBal.innerText = `$${localBalance.toFixed(2)}`;
 
-    const planBadge = document.getElementById('plan-status-badge');
-    if (planBadge && localPlan) {
-        planBadge.innerText = `👑 ${localPlan}`;
-        planBadge.className = 'plan-badge active';
-        planBadge.style.color = '#3fb950';
+        const planBadge = document.getElementById('plan-status-badge');
+        if (planBadge && localPlan) {
+            planBadge.innerText = `👑 ${localPlan}`;
+            planBadge.className = 'plan-badge active';
+            planBadge.style.color = '#3fb950';
+        }
+    } catch (e) {
+        console.error("Init Error:", e);
     }
 
     loadTradingViewChart(currentSymbol);
@@ -47,38 +55,40 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function showStylishPopup(message, type = 'error') {
-    let existing = document.getElementById('custom-toast-popup');
-    if (existing) existing.remove();
+    try {
+        let existing = document.getElementById('custom-toast-popup');
+        if (existing) existing.remove();
 
-    let popup = document.createElement('div');
-    popup.id = 'custom-toast-popup';
-    popup.style.position = 'fixed';
-    popup.style.bottom = '25px';
-    popup.style.right = '25px';
-    popup.style.padding = '16px 22px';
-    popup.style.borderRadius = '12px';
-    popup.style.color = '#fff';
-    popup.style.fontWeight = '500';
-    popup.style.fontSize = '14px';
-    popup.style.zIndex = '99999';
-    popup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
-    popup.style.backdropFilter = 'blur(10px)';
+        let popup = document.createElement('div');
+        popup.id = 'custom-toast-popup';
+        popup.style.position = 'fixed';
+        popup.style.bottom = '25px';
+        popup.style.right = '25px';
+        popup.style.padding = '16px 22px';
+        popup.style.borderRadius = '12px';
+        popup.style.color = '#fff';
+        popup.style.fontWeight = '500';
+        popup.style.fontSize = '14px';
+        popup.style.zIndex = '99999';
+        popup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+        popup.style.backdropFilter = 'blur(10px)';
 
-    let cleanMessage = message ? message.replace(/Bybit/gi, 'Trading') : 'An error occurred.';
+        let cleanMessage = message ? message.replace(/Bybit/gi, 'Trading') : 'An error occurred.';
 
-    if (type === 'error') {
-        popup.style.background = 'linear-gradient(135deg, rgba(218, 54, 51, 0.95), rgba(248, 81, 73, 0.95))';
-        popup.innerHTML = `⚠️ <strong>Error:</strong><br>${cleanMessage}`;
-    } else {
-        popup.style.background = 'linear-gradient(135deg, rgba(35, 134, 54, 0.95), rgba(46, 160, 67, 0.95))';
-        popup.innerHTML = `✅ <strong>Success:</strong><br>${cleanMessage}`;
-    }
+        if (type === 'error') {
+            popup.style.background = 'linear-gradient(135deg, rgba(218, 54, 51, 0.95), rgba(248, 81, 73, 0.95))';
+            popup.innerHTML = `⚠️ <strong>Error:</strong><br>${cleanMessage}`;
+        } else {
+            popup.style.background = 'linear-gradient(135deg, rgba(35, 134, 54, 0.95), rgba(46, 160, 67, 0.95))';
+            popup.innerHTML = `✅ <strong>Success:</strong><br>${cleanMessage}`;
+        }
 
-    document.body.appendChild(popup);
-    setTimeout(() => {
-        popup.style.opacity = '0';
-        setTimeout(() => popup.remove(), 300);
-    }, 6000);
+        document.body.appendChild(popup);
+        setTimeout(() => {
+            popup.style.opacity = '0';
+            setTimeout(() => popup.remove(), 300);
+        }, 6000);
+    } catch (err) {}
 }
 
 function loadTradingViewChart(symbol) {
@@ -86,20 +96,24 @@ function loadTradingViewChart(symbol) {
     if (!container) return;
     container.innerHTML = '';
 
-    if (typeof TradingView !== 'undefined') {
-        new TradingView.widget({
-            "autosize": true,
-            "symbol": "BINANCE:" + symbol,
-            "interval": "15",
-            "timezone": "Etc/UTC",
-            "theme": "dark",
-            "style": "1",
-            "locale": "en",
-            "toolbar_bg": "#161b22",
-            "enable_publishing": false,
-            "hide_top_toolbar": false,
-            "container_id": "tv-chart-frame"
-        });
+    try {
+        if (typeof TradingView !== 'undefined') {
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": "BINANCE:" + symbol,
+                "interval": "15",
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "locale": "en",
+                "toolbar_bg": "#161b22",
+                "enable_publishing": false,
+                "hide_top_toolbar": false,
+                "container_id": "tv-chart-frame"
+            });
+        }
+    } catch (e) {
+        container.innerHTML = '<div style="color: #8b949e; text-align:center; padding-top:40px;">Chart failed to load</div>';
     }
 }
 
@@ -111,12 +125,17 @@ async function fetchLiveCoinPrice(symbol) {
             let price = parseFloat(data.lastPrice);
             let change = parseFloat(data.priceChangePercent);
 
-            document.getElementById('selected-coin-title').innerText = symbol;
-            document.getElementById('coin-price').innerText = `$${price.toFixed(price < 1 ? 4 : 2)}`;
+            let titleEl = document.getElementById('selected-coin-title');
+            if (titleEl) titleEl.innerText = symbol;
+
+            let priceEl = document.getElementById('coin-price');
+            if (priceEl) priceEl.innerText = `$${price.toFixed(price < 1 ? 4 : 2)}`;
             
             const changeEl = document.getElementById('coin-change');
-            changeEl.innerText = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-            changeEl.style.color = change >= 0 ? '#3fb950' : '#f85149';
+            if (changeEl) {
+                changeEl.innerText = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                changeEl.style.color = change >= 0 ? '#3fb950' : '#f85149';
+            }
 
             if (fmaBotActive) {
                 evaluateFMAStrategy(symbol, price);
@@ -130,17 +149,21 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
     if (fmaSetupTriggered) return;
 
     try {
-        let capital = parseFloat(document.getElementById('capital-input').value) || 500;
+        let capitalInput = document.getElementById('capital-input');
+        let capital = capitalInput ? parseFloat(capitalInput.value) || 500 : 500;
         let qty = parseFloat((capital / currentPrice).toFixed(3));
         if (qty <= 0) qty = 1;
 
         fmaSetupTriggered = true;
-        document.getElementById('active-trades-count').innerText = "1";
+        
+        let activeTradesEl = document.getElementById('active-trades-count');
+        if (activeTradesEl) activeTradesEl.innerText = "1";
 
-        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA SIGNAL]</span> Executing backend secure trade...`;
-        terminal.scrollTop = terminal.scrollHeight;
+        if (terminal) {
+            terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA SIGNAL]</span> Executing backend secure trade...`;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
 
-        // Gate.io API integration endpoint and formatted symbol (e.g. BTC_USDT)[cite: 1]
         let formattedSymbol = symbol.includes('_') ? symbol : symbol.replace('USDT', '_USDT');
 
         let tradeRes = await fetch('/api/gate/trade', {
@@ -158,16 +181,16 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
         if (!tradeData.success) {
             let errorText = tradeData.error ? tradeData.error.replace(/Bybit/gi, 'Trading') : 'Trade execution failed.';
             showStylishPopup(errorText, 'error');
-            terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${errorText}`;
+            if (terminal) terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${errorText}`;
         } else {
             showStylishPopup(`LONG order successfully placed via backend for ${symbol}!`, 'success');
-            terminal.innerHTML += `<br><span style="color:#3fb950;">[SUCCESS]</span> Trade executed automatically.`;
+            if (terminal) terminal.innerHTML += `<br><span style="color:#3fb950;">[SUCCESS]</span> Trade executed automatically.`;
         }
-        terminal.scrollTop = terminal.scrollHeight;
+        if (terminal) terminal.scrollTop = terminal.scrollHeight;
     } catch (err) {
         let errText = err.message ? err.message.replace(/Bybit/gi, 'Trading') : 'Network error connecting to backend execution route.';
         showStylishPopup(errText, 'error');
-        terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${errText}`;
+        if (terminal) terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${errText}`;
     }
 }
 
@@ -176,7 +199,9 @@ window.showCoinDropdown = function() {
 };
 
 window.filterCoins = function() {
-    let query = document.getElementById('coin-search').value.toUpperCase();
+    let searchInput = document.getElementById('coin-search');
+    if (!searchInput) return;
+    let query = searchInput.value.toUpperCase();
     let filtered = spotCoins.filter(c => c.symbol.includes(query));
     renderCoinList(filtered);
 };
@@ -198,7 +223,8 @@ function renderCoinList(coins) {
         item.innerHTML = `<strong>${coin.symbol}</strong> <span style="color:#8b949e;">${coin.name}</span>`;
         item.onclick = function() {
             currentSymbol = coin.symbol;
-            document.getElementById('coin-search').value = coin.symbol;
+            let searchInput = document.getElementById('coin-search');
+            if (searchInput) searchInput.value = coin.symbol;
             dropdown.classList.add('hidden');
             fmaSetupTriggered = false;
             loadTradingViewChart(currentSymbol);
@@ -230,7 +256,9 @@ window.switchTab = function(tabName) {
         targetSection.classList.remove('hidden');
         targetSection.classList.add('active');
     }
-    event.currentTarget.classList.add('active');
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    }
 };
 
 window.toggleAdminPanelModal = function() {
@@ -244,8 +272,11 @@ window.switchAdminTab = function(subTab) {
     document.querySelectorAll('.admin-sub-section').forEach(sec => sec.classList.add('hidden'));
     document.querySelectorAll('.admin-tab-btn').forEach(btn => btn.style.background = '#21262d');
 
-    document.getElementById(`admin-section-${subTab}`).classList.remove('hidden');
-    event.currentTarget.style.background = '#1f6feb';
+    let targetSec = document.getElementById(`admin-section-${subTab}`);
+    if (targetSec) targetSec.classList.remove('hidden');
+    if (event && event.currentTarget) {
+        event.currentTarget.style.background = '#1f6feb';
+    }
 };
 
 window.startBot = function() {
@@ -265,17 +296,20 @@ window.stopBot = function() {
 };
 
 window.clearLogs = function() {
-    document.getElementById('terminal-logs').innerHTML = '[SYSTEM] Logs cleared.';
+    let terminal = document.getElementById('terminal-logs');
+    if (terminal) terminal.innerHTML = '[SYSTEM] Logs cleared.';
 };
 
 window.selectPlan = function(planName, price) {
-    document.getElementById('passcode-input').focus();
+    let passcodeIn = document.getElementById('passcode-input');
+    if (passcodeIn) passcodeIn.focus();
     alert(`Selected ${planName} ($${price}). Contact admin via WhatsApp to get your passcode.`);
 };
 
 window.redeemPasscode = async function() {
     let uid = localStorage.getItem('bybit_user_uid');
-    let code = document.getElementById('passcode-input').value.trim();
+    let passcodeIn = document.getElementById('passcode-input');
+    let code = passcodeIn ? passcodeIn.value.trim() : '';
     if (!code) {
         alert('Please enter a passcode');
         return;
@@ -301,25 +335,30 @@ window.redeemPasscode = async function() {
 };
 
 window.adminLogin = function() {
-    let password = document.getElementById('admin-key-input').value;
+    let keyInput = document.getElementById('admin-key-input');
+    let password = keyInput ? keyInput.value : '';
     if (password === 'admin123' || password.length > 2) {
-        document.getElementById('admin-login-box').classList.add('hidden');
-        document.getElementById('admin-dashboard-content').classList.remove('hidden');
+        let loginBox = document.getElementById('admin-login-box');
+        if (loginBox) loginBox.classList.add('hidden');
+        let adminContent = document.getElementById('admin-dashboard-content');
+        if (adminContent) adminContent.classList.remove('hidden');
     } else {
         alert('Invalid Admin Secret Key');
     }
 };
 
 window.generatePasscode = async function() {
-    let tier = document.getElementById('passcode-tier-input').value;
+    let tierInput = document.getElementById('passcode-tier-input');
+    let tier = tierInput ? tierInput.value : 'VIP';
     let res = await fetch('/api/codes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tier })
     });
     let data = await res.json();
-    if (data && data.code) {
-        document.getElementById('generated-code-display').innerHTML = `<strong>Generated Code:</strong> <span style="color:yellow; font-size:16px;">${data.code}</span> (${tier})`;
+    let codeDisplay = document.getElementById('generated-code-display');
+    if (data && data.code && codeDisplay) {
+        codeDisplay.innerHTML = `<strong>Generated Code:</strong> <span style="color:yellow; font-size:16px;">${data.code}</span> (${tier})`;
     }
 };
 
@@ -331,8 +370,10 @@ window.editUserBalance = function() {
     let newBal = prompt('Enter new total wallet balance for user:', '500');
     if (newBal) {
         localStorage.setItem('bybit_balance', newBal);
-        document.getElementById('header-balance').innerText = `$${parseFloat(newBal).toFixed(2)}`;
-        document.getElementById('admin-wallet-bal').innerText = `$${parseFloat(newBal).toFixed(2)}`;
+        let headerBal = document.getElementById('header-balance');
+        if (headerBal) headerBal.innerText = `$${parseFloat(newBal).toFixed(2)}`;
+        let adminWalletBal = document.getElementById('admin-wallet-bal');
+        if (adminWalletBal) adminWalletBal.innerText = `$${parseFloat(newBal).toFixed(2)}`;
         alert('Balance updated successfully!');
     }
 };
@@ -344,8 +385,11 @@ window.pauseAllBots = function() {
 
 window.submitDeposit = async function() {
     let uid = localStorage.getItem('bybit_user_uid');
-    let details = document.getElementById('tx-hash-input').value;
-    let amount = document.getElementById('deposit-amount').value;
+    let txInput = document.getElementById('tx-hash-input');
+    let amountInput = document.getElementById('deposit-amount');
+
+    let details = txInput ? txInput.value : '';
+    let amount = amountInput ? amountInput.value : '';
 
     if (!details || !amount) {
         alert('Please fill out all deposit details.');
@@ -368,11 +412,9 @@ async function loadAdminSettings() {
     try {
         let res = await fetch('/api/admin/settings');
         let settings = await res.json();
-        if (settings && document.getElementById('display-usdt-wallet')) {
-            document.getElementById('display-usdt-wallet').innerText = settings.usdtAddress;
+        let usdtWalletEl = document.getElementById('display-usdt-wallet');
+        if (settings && usdtWalletEl) {
+            usdtWalletEl.innerText = settings.usdtAddress;
         }
     } catch (e) {}
 }
-```[cite: 1]
-
-Aap is updated code ko apni `script.js` file mein save karke GitHub par push kar dein, ab aapka bot theek tareeqay se Gate.io API ke sath backend par kaam karega[cite: 1, 10, 11]!
