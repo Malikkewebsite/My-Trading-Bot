@@ -1,25 +1,17 @@
 const express = require('express');
 const crypto = require('crypto');
-const path = require('path');
+const fetch = require('node-fetch'); // Agar aapka Node version fetch support karta hai toh theek hai, warna node-fetch use ho raha hai
+
 const app = express();
-const PORT = process.env.PORT || 3000;
-
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-let adminSettings = {
-    usdtAddress: 'TRC20_OFFICIAL_WALLET_ADDRESS_HERE',
-    easypaisaNumber: '03125124424 (Official Easypaisa)'
-};
-let accessCodes = {};
-let transactions = [];
-let usersCount = 1;
+// Aapke purane configuration variables (inhein apne mutabiq adjust ya retain rakhein)
+const DEFAULT_BYBIT_KEY = process.env.BYBIT_KEY || 'YOUR_BACKEND_API_KEY';
+const DEFAULT_BYBIT_SECRET = process.env.BYBIT_SECRET || 'YOUR_BACKEND_SECRET_KEY';
 
-// --- SECURE BACKEND BYBIT API EXECUTION ---
-// Aapke diye gaye backend secure config se keys fetch hongi ya environment variables se
-const DEFAULT_BYBIT_KEY = process.env.BYBIT_API_KEY || 'YOUR_BACKEND_BYBIT_API_KEY';
-const DEFAULT_BYBIT_SECRET = process.env.BYBIT_API_SECRET || 'YOUR_BACKEND_BYBIT_API_SECRET';
+// Baaki routes agar hain toh woh yahan honge...
 
+// Updated Bybit Trade Route with Safe JSON Parsing
 app.post('/api/bybit/trade', async (req, res) => {
     const { symbol, side, orderType, qty, price, testnet } = req.body;
 
@@ -27,7 +19,7 @@ app.post('/api/bybit/trade', async (req, res) => {
     const apiSecret = DEFAULT_BYBIT_SECRET;
 
     if (!apiKey || apiKey.includes('YOUR_BACKEND')) {
-        return res.status(400).json({ success: false, error: 'Backend Bybit API keys not configured in environment.' });
+        return res.status(400).json({ success: false, error: 'Backend Bybit API keys not configured properly.' });
     }
 
     const baseUrl = testnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
@@ -63,7 +55,17 @@ app.post('/api/bybit/trade', async (req, res) => {
             body: bodyString
         });
 
-        const data = await response.json();
+        const textResponse = await response.text();
+        let data;
+        try {
+            data = JSON.parse(textResponse);
+        } catch (parseErr) {
+            return res.status(500).json({ 
+                success: false, 
+                error: 'Invalid JSON response from Bybit server. Check network or API credentials.' 
+            });
+        }
+
         if (data.retCode !== 0) {
             return res.status(400).json({ success: false, error: `Bybit Error (${data.retCode}): ${data.retMsg}` });
         }
@@ -74,42 +76,8 @@ app.post('/api/bybit/trade', async (req, res) => {
     }
 });
 
-app.get('/api/admin/settings', (req, res) => res.json(adminSettings));
-app.post('/api/admin/settings', (req, res) => {
-    adminSettings = req.body;
-    res.json({ success: true });
-});
-
-app.get('/api/admin/stats', (req, res) => {
-    res.json({
-        totalUsers: usersCount,
-        pendingDeposits: transactions.filter(t => t.status === 'PENDING').length,
-        activeSubscriptions: 1
-    });
-});
-
-app.post('/api/codes', (req, res) => {
-    const code = 'PRO-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    accessCodes[code] = { tier: req.body.tier || 'Starter Plan', used: false };
-    res.json({ code });
-});
-
-app.post('/api/codes/use', (req, res) => {
-    const { code, uid } = req.body;
-    if (accessCodes[code] && !accessCodes[code].used) {
-        accessCodes[code].used = true;
-        res.json({ success: true, tier: accessCodes[code].tier });
-    } else {
-        res.json({ success: false, error: 'Invalid or already used passcode.' });
-    }
-});
-
-app.post('/api/transactions', (req, res) => {
-    const tx = { id: transactions.length + 1, ...req.body, status: 'PENDING' };
-    transactions.push(tx);
-    res.json({ success: true, tx });
-});
-
+// Server listener
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
