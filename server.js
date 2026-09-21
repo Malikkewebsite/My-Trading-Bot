@@ -8,8 +8,8 @@ app.use(express.json());
 // Serve static frontend files from the 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-const DEFAULT_BYBIT_KEY = process.env.BYBIT_KEY;
-const DEFAULT_BYBIT_SECRET = process.env.BYBIT_SECRET;
+const DEFAULT_BYBIT_KEY = process.env.BYBIT_API_KEY;
+const DEFAULT_BYBIT_SECRET = process.env.BYBIT_API_SECRET;
 
 // Root route to serve index.html from public folder
 app.get('/', (req, res) => {
@@ -25,7 +25,7 @@ app.post('/api/bybit/trade', async (req, res) => {
         const apiSecret = DEFAULT_BYBIT_SECRET;
 
         if (!apiKey || !apiSecret) {
-            return res.status(400).json({ success: false, error: 'Environment variables BYBIT_KEY or BYBIT_SECRET are missing.' });
+            return res.status(400).json({ success: false, error: 'Environment variables BYBIT_API_KEY or BYBIT_API_SECRET are missing.' });
         }
 
         const baseUrl = testnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
