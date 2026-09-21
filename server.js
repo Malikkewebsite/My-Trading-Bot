@@ -1,21 +1,22 @@
 const express = require('express');
 const crypto = require('crypto');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
 
-// Serve your frontend static files (HTML, CSS, JS) from the current directory or a 'public' folder
-app.use(express.static('.'));
+// Serve static frontend files from the 'public' folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 const DEFAULT_BYBIT_KEY = process.env.BYBIT_KEY || 'YOUR_BACKEND_API_KEY';
 const DEFAULT_BYBIT_SECRET = process.env.BYBIT_SECRET || 'YOUR_BACKEND_SECRET_KEY';
 
-// Root route for safety fallback
+// Root route to serve index.html from public folder
 app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Updated Bybit Trade Route with Safe JSON Parsing
+// Bybit Trade Route with Safe JSON Parsing and Error Handling
 app.post('/api/bybit/trade', async (req, res) => {
     try {
         const { symbol, side, orderType, qty, price, testnet } = req.body;
