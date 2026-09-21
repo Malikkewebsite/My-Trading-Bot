@@ -15,12 +15,13 @@ try {
 const DEFAULT_GATE_KEY = process.env.GATE_API_KEY;
 const DEFAULT_GATE_SECRET = process.env.GATE_API_SECRET;
 
-// Bot State Management for FVG + 50 EMA Strategy
+// Bot State Management with Repeat Trade & Fresh FVG Protection
 let botState = {
     isRunning: false,
     symbol: 'BTC_USDT',
     capital: 5,
-    intervalId: null
+    intervalId: null,
+    lastTradedFvgTime: null // Purane ya already traded setup ko dubara trade karne se rokne ke liye
 };
 
 app.get('/', (req, res) => {
@@ -144,7 +145,7 @@ async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '
     return data;
 }
 
-// 1. Start Bot & Run Algorithmic FVG + 50 EMA Strategy
+// 1. Start Bot & Run Algorithmic FVG (Unmitigated) + 50 EMA Strategy
 app.post('/api/gate/trade', async (req, res) => {
     try {
         const combinedData = { ...(req.query || {}), ...(req.body || {}) };
@@ -162,16 +163,16 @@ app.post('/api/gate/trade', async (req, res) => {
         const symbol = combinedData.symbol || 'BTC_USDT';
 
         if (botState.isRunning) {
-            return res.json({ success: true, message: 'Bot is already running and monitoring FVG + 50 EMA strategy.' });
+            return res.json({ success: true, message: 'Bot is already running and monitoring fresh FVG + 50 EMA strategy.' });
         }
 
         botState.isRunning = true;
         botState.symbol = symbol;
         botState.capital = rawQty;
 
-        console.log(`[BOT STARTED] Monitoring 15m chart for ${symbol} using strict FVG + 50 EMA Strategy...`);
+        console.log(`[BOT STARTED] Monitoring 15m chart for ${symbol} using strict Unmitigated FVG + 50 EMA Strategy...`);
 
-        // Algorithmic Strategy Loop (Runs every 15 seconds to check 15m candles)
+        // Algorithmic Strategy Loop
         botState.intervalId = setInterval(async () => {
             if (!botState.isRunning) {
                 clearInterval(botState.intervalId);
@@ -181,7 +182,6 @@ app.post('/api/gate/trade', async (req, res) => {
             try {
                 const host = 'api.gateio.ws';
                 const prefix = '/api/v4';
-                // Fetch 15m candlesticks (limit 100 candles for EMA and FVG detection)
                 const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${botState.symbol}&interval=15m&limit=100`);
                 const klines = await klinesRes.json();
 
@@ -190,7 +190,6 @@ app.post('/api/gate/trade', async (req, res) => {
                     return;
                 }
 
-                // Gate.io kline format: [timestamp, volume, close, high, low, open, ...]
                 const formattedCandles = klines.map(k => ({
                     time: k[0],
                     open: parseFloat(k[5]),
@@ -199,16 +198,13 @@ app.post('/api/gate/trade', async (req, res) => {
                     close: parseFloat(k[2])
                 }));
 
-                // Calculate 50 EMA on closes
                 const closes = formattedCandles.map(c => c.close);
                 const ema50Array = calculateEMA(closes, 50);
 
                 let validSetupFound = false;
-                let activeFvgLow = 0;
-                let activeFvgHigh = 0;
+                let matchedFvgTime = null;
 
-                // Step 2: Algorithmic Bullish FVG Detection
-                // A bullish FVG occurs between candle i-2 and candle i where: Low[i] > High[i-2]
+                // Step 2 & Unmitigated Rule: Detect Bullish FVG
                 for (let i = 2; i < formattedCandles.length - 1; i++) {
                     const c1 = formattedCandles[i - 2];
                     const c3 = formattedCandles[i];
@@ -216,29 +212,55 @@ app.post('/api/gate/trade', async (req, res) => {
                     if (c3.low > c1.high) {
                         const fvgBottom = c1.high;
                         const fvgTop = c3.low;
+                        const fvgTimestamp = c3.time;
 
-                        // Check subsequent price action for retests (Touch conditions)
+                        // Agar yeh FVG pehle hi trade ho chuka hai, toh isko skip kardein (Repeat Trade Protection)
+                        if (botState.lastTradedFvgTime === fvgTimestamp) {
+                            continue;
+                        }
+
+                        // Check if FVG was already mitigated (touched/crossed) before our target test candle
+                        let isAlreadyMitigatedBefore = false;
+                        let touchFound = false;
+                        let targetTestCandle = null;
+                        let targetEma = 0;
+
                         for (let j = i + 1; j < formattedCandles.length; j++) {
                             const testCandle = formattedCandles[j];
                             const currentEMA = ema50Array[j];
 
-                            // Condition A: Price touches FVG zone
                             const touchedFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
 
-                            // Condition B: Price touches / interacts with 50 EMA (within 0.3% tolerance)
-                            const touchedEma = Math.abs(testCandle.low - currentEMA) / currentEMA <= 0.003 || 
-                                               (testCandle.low <= currentEMA && testCandle.high >= currentEMA);
+                            if (!touchFound) {
+                                if (touchedFvg) {
+                                    // Yeh pehla touch hai, matlab FVG unmitigated tha aur abhi test hua hai!
+                                    touchFound = true;
+                                    targetTestCandle = testCandle;
+                                    targetEma = currentEMA;
+                                }
+                            } else {
+                                // Agar pehle touch ke baad koi aur candle aayi aur usne FVG ko cross kar liya bina proper setup ke, toh mitigated maana jayega
+                                if (testCandle.low < fvgBottom) {
+                                    isAlreadyMitigatedBefore = true;
+                                    break;
+                                }
+                            }
+                        }
 
-                            if (touchedFvg && touchedEma) {
+                        if (touchFound && !isAlreadyMitigatedBefore && targetTestCandle) {
+                            // Condition A & B: Check FVG touch and 50 EMA touch simultaneously
+                            const touchedFvgNow = targetTestCandle.low <= fvgTop && targetTestCandle.high >= fvgBottom;
+                            const touchedEmaNow = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003 || 
+                                                  (targetTestCandle.low <= targetEma && targetTestCandle.high >= targetEma);
+
+                            if (touchedFvgNow && touchedEmaNow) {
                                 // Step 5: Bullish Confirmation Candle Check
-                                // Confirmation candle must be green (close > open) with rejection/momentum, and 50 EMA not broken downward meaningfully
-                                const isGreen = testCandle.close > testCandle.open;
-                                const emaNotBroken = testCandle.low >= (currentEMA * 0.995);
+                                const isGreen = targetTestCandle.close > targetTestCandle.open;
+                                const emaNotBroken = targetTestCandle.low >= (targetEma * 0.995);
 
                                 if (isGreen && emaNotBroken) {
                                     validSetupFound = true;
-                                    activeFvgLow = fvgBottom;
-                                    activeFvgHigh = fvgTop;
+                                    matchedFvgTime = fvgTimestamp;
                                     break;
                                 }
                             }
@@ -248,27 +270,29 @@ app.post('/api/gate/trade', async (req, res) => {
                 }
 
                 if (!validSetupFound) {
-                    console.log("[NO TRADE / CONDITION NOT MET] FVG, 50 EMA touch, or Bullish confirmation criteria not satisfied.");
+                    console.log("[NO TRADE / CONDITION NOT MET] No fresh unmitigated FVG + 50 EMA touch & confirmation found.");
                     return;
                 }
 
-                console.log(`[SETUP MET] Bullish FVG & 50 EMA criteria satisfied for ${botState.symbol}. Executing LONG entry...`);
+                console.log(`[SETUP MET] Fresh unmitigated FVG & 50 EMA criteria satisfied. Executing LONG entry...`);
 
-                // Step 6 & 7 & 8: Execute LONG Entry, Stop Loss below FVG, and 1:3 Take Profit
-                const orderRes = await executeGateOrder(botState.symbol, 'buy', 'market', botState.capital);
+                // Save this FVG timestamp so it never triggers twice
+                botState.lastTradedFvgTime = matchedFvgTime;
+
+                // Execute LONG Entry
+                await executeGateOrder(botState.symbol, 'buy', 'market', botState.capital);
                 
-                // Stop monitoring after successful trade execution for this setup
                 botState.isRunning = false;
                 clearInterval(botState.intervalId);
 
             } catch (loopErr) {
                 console.error("Strategy Loop Error:", loopErr.message);
             }
-        }, 15000); // Check every 15 seconds
+        }, 15000);
 
         jsonResponse(res, { 
             success: true, 
-            message: 'Bot started successfully. Continuously monitoring 15m FVG and 50 EMA strategy conditions...' 
+            message: 'Bot started successfully. Monitoring fresh unmitigated FVG and 50 EMA strategy conditions...' 
         });
 
     } catch (err) {
@@ -296,7 +320,6 @@ app.post('/api/gate/close-all', async (req, res) => {
         const prefix = '/api/v4';
         const t = Math.floor(Date.now() / 1000).toString();
 
-        // Step A: Cancel all open spot orders
         const ordersUrl = '/spot/orders';
         const getSigStr = `GET\n${prefix + ordersUrl}\n\nstatus=open\n${t}`;
         const getSig = crypto.createHmac('sha512', apiSecret).update(getSigStr).digest('hex');
@@ -321,7 +344,6 @@ app.post('/api/gate/close-all', async (req, res) => {
             }
         }
 
-        // Step B: Fetch spot accounts to find any filled coins and market sell them instantly
         const accUrl = '/spot/accounts';
         const accT = Math.floor(Date.now() / 1000).toString();
         const accSigStr = `GET\n${prefix + accUrl}\n\n\n${accT}`;
