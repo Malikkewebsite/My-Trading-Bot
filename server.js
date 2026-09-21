@@ -7,7 +7,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// In-memory data store for demo/production persistence
 let adminSettings = {
     usdtAddress: 'TRC20_OFFICIAL_WALLET_ADDRESS_HERE',
     easypaisaNumber: '03001234567 (Official Easypaisa)'
@@ -18,10 +17,13 @@ let usersCount = 1;
 
 // --- BYBIT REAL EXCHANGE ORDER EXECUTION ROUTE ---
 app.post('/api/bybit/trade', async (req, res) => {
-    const { apiKey, apiSecret, symbol, side, orderType, qty, price, testnet } = req.body;
+    // Fallback to embedded keys if frontend didn't send them
+    const apiKey = req.body.apiKey || 'eZKaZBvZ02FENX5Jd';
+    const apiSecret = req.body.apiSecret || 'TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw';
+    const { symbol, side, orderType, qty, price, testnet } = req.body;
 
     if (!apiKey || !apiSecret) {
-        return res.status(400).json({ success: false, error: 'Bybit API Key and Secret are required in bot config.' });
+        return res.status(400).json({ success: false, error: 'Bybit API Key and Secret are required.' });
     }
 
     const baseUrl = testnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
