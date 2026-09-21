@@ -61,13 +61,17 @@ app.post('/api/bybit/trade', async (req, res) => {
         });
 
         const textResponse = await response.text();
+        
+        // Debugging print to check what Bybit is actually sending back
+        console.log("Bybit Raw Response:", textResponse);
+
         let data;
         try {
             data = JSON.parse(textResponse);
         } catch (parseErr) {
-            return res.status(500).json({ 
-                success: false, 
-                error: 'Invalid JSON response from exchange server. Check network or API credentials.' 
+            return res.status(500).json({
+                success: false,
+                error: `Exchange raw response error: ${textResponse.substring(0, 100)}`
             });
         }
 
@@ -81,7 +85,7 @@ app.post('/api/bybit/trade', async (req, res) => {
     }
 });
 
-// Local development server listener vs Vercel serverless export
+// local development server listener vs Vercel serverless export
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
