@@ -6,7 +6,6 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Safe static file serving
 try {
     app.use(express.static(path.join(__dirname, 'public')));
 } catch (e) {
@@ -16,7 +15,6 @@ try {
 const DEFAULT_GATE_KEY = process.env.GATE_API_KEY;
 const DEFAULT_GATE_SECRET = process.env.GATE_API_SECRET;
 
-// Root route with error handling
 app.get('/', (req, res) => {
     try {
         res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -57,7 +55,6 @@ app.post('/api/admin/generate', (req, res) => {
     });
 });
 
-// Deep recursive search function to find amount/capital anywhere in the request body
 function findAmount(obj) {
     if (!obj || typeof obj !== 'object') return null;
     
@@ -77,7 +74,6 @@ function findAmount(obj) {
     return null;
 }
 
-// Gate.io Trade Route
 app.post('/api/gate/trade', async (req, res) => {
     try {
         const combinedData = { ...(req.query || {}), ...(req.body || {}) };
@@ -90,10 +86,9 @@ app.post('/api/gate/trade', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Environment variables API keys are missing.' });
         }
 
-        // Use deep search to extract amount securely
         let rawQty = findAmount(combinedData);
         if (rawQty === null || isNaN(rawQty) || rawQty <= 0) {
-            rawQty = 1; // absolute safe fallback
+            rawQty = 1;
         }
 
         const host = 'api.gateio.ws';
@@ -131,7 +126,7 @@ app.post('/api/gate/trade', async (req, res) => {
         const signatureString = `${method}\n${prefix + url}\n\n${hashedPayload}\n${t}`;
         const signature = crypto.createHmac('sha512', apiSecret).update(signatureString).digest('hex');
 
-        const response =- await fetch(`https://${host}${prefix}${url}`, {
+        const response = await fetch(`https://${host}${prefix}${url}`, {
             method: method,
             headers: {
                 'Accept': 'application/json',
