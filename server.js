@@ -1,48 +1,43 @@
 const express = require('express');
 const crypto = require('crypto');
-const fetch = require('node-fetch'); // Agar aapka Node version fetch support karta hai toh theek hai, warna node-fetch use ho raha hai
 
 const app = express();
 app.use(express.json());
 
-// Aapke purane configuration variables (inhein apne mutabiq adjust ya retain rakhein)
 const DEFAULT_BYBIT_KEY = process.env.BYBIT_KEY || 'YOUR_BACKEND_API_KEY';
 const DEFAULT_BYBIT_SECRET = process.env.BYBIT_SECRET || 'YOUR_BACKEND_SECRET_KEY';
 
-// Baaki routes agar hain toh woh yahan honge...
-
-// Updated Bybit Trade Route with Safe JSON Parsing
 app.post('/api/bybit/trade', async (req, res) => {
-    const { symbol, side, orderType, qty, price, testnet } = req.body;
-
-    const apiKey = DEFAULT_BYBIT_KEY;
-    const apiSecret = DEFAULT_BYBIT_SECRET;
-
-    if (!apiKey || apiKey.includes('YOUR_BACKEND')) {
-        return res.status(400).json({ success: false, error: 'Backend Bybit API keys not configured properly.' });
-    }
-
-    const baseUrl = testnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
-    const endpoint = '/v5/order/create';
-    const timestamp = Date.now().toString();
-    const recvWindow = '5000';
-
-    const payload = {
-        category: 'spot',
-        symbol: symbol,
-        side: side,
-        orderType: orderType,
-        qty: qty.toString(),
-        price: price ? price.toString() : undefined
-    };
-
-    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
-
-    const bodyString = JSON.stringify(payload);
-    const signatureString = timestamp + apiKey + recvWindow + bodyString;
-    const signature = crypto.createHmac('sha256', apiSecret).update(signatureString).digest('hex');
-
     try {
+        const { symbol, side, orderType, qty, price, testnet } = req.body;
+
+        const apiKey = DEFAULT_BYBIT_KEY;
+        const apiSecret = DEFAULT_BYBIT_SECRET;
+
+        if (!apiKey || apiKey.includes('YOUR_BACKEND')) {
+            return res.status(400).json({ success: false, error: 'Backend Bybit API keys not configured properly.' });
+        }
+
+        const baseUrl = testnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
+        const endpoint = '/v5/order/create';
+        const timestamp = Date.now().toString();
+        const recvWindow = '5000';
+
+        const payload = {
+            category: 'spot',
+            symbol: symbol,
+            side: side,
+            orderType: orderType,
+            qty: qty.toString(),
+            price: price ? price.toString() : undefined
+        };
+
+        Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+        const bodyString = JSON.stringify(payload);
+        const signatureString = timestamp + apiKey + recvWindow + bodyString;
+        const signature = crypto.createHmac('sha256', apiSecret).update(signatureString).digest('hex');
+
         const response = await fetch(baseUrl + endpoint, {
             method: 'POST',
             headers: {
@@ -62,7 +57,7 @@ app.post('/api/bybit/trade', async (req, res) => {
         } catch (parseErr) {
             return res.status(500).json({ 
                 success: false, 
-                error: 'Invalid JSON response from Bybit server. Check network or API credentials.' 
+                error: 'Invalid JSON response from Bybit server.' 
             });
         }
 
@@ -72,12 +67,14 @@ app.post('/api/bybit/trade', async (req, res) => {
 
         res.json({ success: true, data: data.result });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message || 'Failed to connect to Bybit server.' });
+        res.status(500).json({ success: false, error: err.message || 'Server internal error.' });
     }
 });
 
-// Server listener
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+// For local testing vs Vercel serverless export
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+module.exports = app;
