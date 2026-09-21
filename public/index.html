@@ -51,7 +51,7 @@
                         <div class="coin-header-info">
                             <div>
                                 <h3 id="selected-coin-title">BTCUSDT</h3>
-                                <span class="timeframe-tag">15m Live Candle</span>
+                                <span class="timeframe-tag">15m Live Candle (FMA Active)</span>
                             </div>
                             <div class="price-box-right">
                                 <span id="coin-price" class="price-tag">$--.--</span>
@@ -69,6 +69,7 @@
                         <div class="form-group">
                             <label>Strategy Mode</label>
                             <select id="strategy-select">
+                                <option>FMA Strategy (FVG + 50 EMA)</option>
                                 <option>Smart Money Concepts (SMC + FVG)</option>
                                 <option>EMA Strategy</option>
                                 <option>Dynamic Grid Arbitrage</option>
@@ -95,11 +96,11 @@
 
                 <div class="terminal-box">
                     <div class="terminal-header">
-                        <span>Execution Terminal & Signal Logs</span>
+                        <span>FMA Strategy Execution & Signal Logs</span>
                         <button onclick="clearLogs()" class="btn-clear">Clear Logs</button>
                     </div>
                     <div id="terminal-logs" class="terminal-body">
-                        [SYSTEM] Secure connection established with exchange feed. 15m candle stream active.
+                        [SYSTEM] FMA Strategy initialized. Monitoring 15m Bullish FVG & 50 EMA dual-touch setups...
                     </div>
                 </div>
             </section>
