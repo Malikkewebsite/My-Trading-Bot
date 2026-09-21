@@ -107,13 +107,12 @@ app.post('/api/gate/trade', async (req, res) => {
         const bodyObj = {
             currency_pair: symbol, 
             side: sSide, 
-            type: oType
+            type: oType,
+            amount: finalQty.toString()
         };
 
         if (oType === 'market' && sSide === 'buy') {
             bodyObj.quote_amount = finalQty.toString();
-        } else {
-            bodyObj.amount = finalQty.toString();
         }
 
         if (oType !== 'market') {
