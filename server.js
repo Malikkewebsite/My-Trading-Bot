@@ -62,7 +62,7 @@ app.post('/api/admin/generate', (req, res) => {
 app.post('/api/gate/trade', async (req, res) => {
     try {
         console.log("Incoming Trade Request Body:", req.body);
-        const { symbol, side, orderType, qty, amount, capital, size, price } = req.body || {};
+        const bodyData = req.body || {};
 
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
@@ -71,11 +71,26 @@ app.post('/api/gate/trade', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Environment variables API keys are missing.' });
         }
 
-        // Robust fallback to ensure amount/qty is never null
-        const rawQty = qty !== undefined && qty !== null && qty !== '' ? qty :
-                       (amount !== undefined && amount !== null && amount !== '' ? amount :
-                       (capital !== undefined && capital !== null && capital !== '' ? capital :
-                       (size !== undefined && size !== null && size !== '' ? size : '2')));
+        // Exhaustive fallback: check every possible property name the frontend might send
+        let rawQty = bodyData.qty ?? 
+                     bodyData.amount ?? 
+                     bodyData.capital ?? 
+                     bodyData.size ?? 
+                     bodyData.capitalAllocation ?? 
+                     bodyData.capital_allocation ?? 
+                     bodyData.allocation ?? 
+                     bodyData.usdt ?? 
+                     bodyData.value;
+
+        // Ultimate fallback: if no known key matches, search all values in the request body for a valid number
+        if (rawQty === undefined || rawQty === null || rawQty === '') {
+            for (const val of Object.values(bodyData)) {
+                if (typeof val === 'number' || (typeof val === 'string' && !isNaN(val) && val.trim() !== '')) {
+                    rawQty = val;
+                    break;
+                }
+            }
+        }
 
         const parsedQty = Number(rawQty);
         const finalQty = (isNaN(parsedQty) || parsedQty <= 0) ? 2 : parsedQty;
@@ -85,11 +100,12 @@ app.post('/api/gate/trade', async (req, res) => {
         const url = '/spot/orders';
         const method = 'POST';
 
-        const oType = orderType ? orderType.toLowerCase() : 'market';
-        const sSide = side ? side.toLowerCase() : 'buy';
+        const oType = bodyData.orderType ? bodyData.orderType.toLowerCase() : 'market';
+        const sSide = bodyData.side ? bodyData.side.toLowerCase() : 'buy';
+        const symbol = bodyData.symbol || 'DOGE_USDT';
 
         const bodyObj = {
-            currency_pair: symbol || 'DOGE_USDT', 
+            currency_pair: symbol, 
             side: sSide, 
             type: oType
         };
@@ -102,7 +118,7 @@ app.post('/api/gate/trade', async (req, res) => {
         }
 
         if (oType !== 'market') {
-            bodyObj.price = price ? price.toString() : '0';
+            bodyObj.price = bodyData.price ? bodyData.price.toString() : '0';
         } else {
             bodyObj.time_in_force = 'ioc';
         }
