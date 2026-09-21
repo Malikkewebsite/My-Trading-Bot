@@ -4,9 +4,18 @@ const crypto = require('crypto');
 const app = express();
 app.use(express.json());
 
+// Serve your frontend static files (HTML, CSS, JS) from the current directory or a 'public' folder
+app.use(express.static('.'));
+
 const DEFAULT_BYBIT_KEY = process.env.BYBIT_KEY || 'YOUR_BACKEND_API_KEY';
 const DEFAULT_BYBIT_SECRET = process.env.BYBIT_SECRET || 'YOUR_BACKEND_SECRET_KEY';
 
+// Root route for safety fallback
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/index.html');
+});
+
+// Updated Bybit Trade Route with Safe JSON Parsing
 app.post('/api/bybit/trade', async (req, res) => {
     try {
         const { symbol, side, orderType, qty, price, testnet } = req.body;
@@ -57,7 +66,7 @@ app.post('/api/bybit/trade', async (req, res) => {
         } catch (parseErr) {
             return res.status(500).json({ 
                 success: false, 
-                error: 'Invalid JSON response from Bybit server.' 
+                error: 'Invalid JSON response from Bybit server. Check network or API credentials.' 
             });
         }
 
@@ -67,14 +76,16 @@ app.post('/api/bybit/trade', async (req, res) => {
 
         res.json({ success: true, data: data.result });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message || 'Server internal error.' });
+        res.status(500).json({ success: false, error: err.message || 'Failed to connect to Bybit server.' });
     }
 });
 
-// For local testing vs Vercel serverless export
+// Local development server listener vs Vercel serverless export
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
 }
 
 module.exports = app;
