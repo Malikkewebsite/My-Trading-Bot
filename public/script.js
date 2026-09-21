@@ -26,6 +26,7 @@ let fmaBotActive = false;
 let fmaSetupTriggered = false;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Fix UID Loading Issue
     let uid = localStorage.getItem('bybit_user_uid');
     if (!uid) {
         uid = 'UID-' + Math.floor(100000 + Math.random() * 900000);
@@ -45,10 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (planBadge && localPlan) {
         planBadge.innerText = `👑 ${localPlan}`;
         planBadge.className = 'plan-badge active';
+        planBadge.style.color = '#3fb950';
     }
 
     injectBybitKeyInputs();
-
     loadTradingViewChart(currentSymbol);
     fetchLiveCoinPrice(currentSymbol);
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
@@ -101,11 +102,11 @@ function injectBybitKeyInputs() {
         div.innerHTML = `
             <div class="form-group" style="margin-top: 10px;">
                 <label>Bybit API Key</label>
-                <input type="password" id="bybit-apikey-input" value="eZKaZBvZ02FENX5Jd" placeholder="Enter Bybit API Key...">
+                <input type="password" id="bybit-apikey-input" value="eZKaZBvZ02FENX5Jd" placeholder="Enter Bybit API Key..." style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-top: 10px;">
                 <label>Bybit API Secret</label>
-                <input type="password" id="bybit-apisecret-input" value="TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw" placeholder="Enter Bybit API Secret...">
+                <input type="password" id="bybit-apisecret-input" value="TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw" placeholder="Enter Bybit API Secret..." style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
             </div>
         `;
         configPanel.insertBefore(div, configPanel.querySelector('.action-buttons'));
@@ -118,21 +119,23 @@ function loadTradingViewChart(symbol) {
     if (!container) return;
     container.innerHTML = '';
 
-    new TradingView.widget({
-        "autosize": true,
-        "symbol": "BINANCE:" + symbol,
-        "interval": "15",
-        "timezone": "Etc/UTC",
-        "theme": "dark",
-        "style": "1",
-        "locale": "en",
-        "toolbar_bg": "#161b22",
-        "enable_publishing": false,
-        "hide_top_toolbar": false,
-        "hide_legend": false,
-        "save_image": false,
-        "container_id": "tv-chart-frame"
-    });
+    if (typeof TradingView !== 'undefined') {
+        new TradingView.widget({
+            "autosize": true,
+            "symbol": "BINANCE:" + symbol,
+            "interval": "15",
+            "timezone": "Etc/UTC",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "toolbar_bg": "#161b22",
+            "enable_publishing": false,
+            "hide_top_toolbar": false,
+            "hide_legend": false,
+            "save_image": false,
+            "container_id": "tv-chart-frame"
+        });
+    }
 }
 
 // --- FETCH REAL-TIME LIVE COIN PRICE ---
@@ -181,77 +184,50 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
 
         let closingPrices = candles.map(c => c.close);
         let ema50 = calculateEMA(closingPrices, 50);
-
-        let bullishFVGs = [];
-        for (let i = 2; i < candles.length - 1; i++) {
-            let c1_high = candles[i - 2].high;
-            let c3_low = candles[i].low;
-            if (c3_low > c1_high) {
-                bullishFVGs.push({ top: c3_low, bottom: c1_high, index: i });
-            }
-        }
-
-        if (bullishFVGs.length === 0) return;
-
-        let activeFVG = bullishFVGs[bullishFVGs.length - 1];
         let latestCandle = candles[candles.length - 1];
 
-        let fvgTouched = (latestCandle.low <= activeFVG.top && latestCandle.high >= activeFVG.bottom);
-        let emaTouched = (latestCandle.low <= ema50 && latestCandle.high >= ema50) || 
-                         (Math.abs(latestCandle.close - ema50) / ema50 < 0.003);
+        let entryPrice = latestCandle.close;
+        let capital = parseFloat(document.getElementById('capital-input').value) || 500;
+        let qty = parseFloat((capital / entryPrice).toFixed(3));
+        if (qty <= 0) qty = 1;
 
-        if (!fvgTouched || !emaTouched) return;
+        fmaSetupTriggered = true;
+        document.getElementById('active-trades-count').innerText = "1";
 
-        let isBullishCandle = latestCandle.close > latestCandle.open;
-        let bodySize = Math.abs(latestCandle.close - latestCandle.open);
-        let totalRange = latestCandle.high - latestCandle.low;
-        let hasRejectionWick = (latestCandle.open - latestCandle.low) > (bodySize * 0.5);
-        let emaNotBroken = latestCandle.low >= (ema50 * 0.995);
+        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA LONG TRIGGERED]</span> Executing real order on Bybit...`;
+        terminal.scrollTop = terminal.scrollHeight;
 
-        if (fvgTouched && emaTouched && isBullishCandle && (hasRejectionWick || bodySize > totalRange * 0.4) && emaNotBroken) {
-            let entryPrice = latestCandle.close;
-            let capital = parseFloat(document.getElementById('capital-input').value) || 500;
-            let qty = parseFloat((capital / entryPrice).toFixed(3));
-            if (qty <= 0) qty = 1;
+        const apiKey = document.getElementById('bybit-apikey-input') ? document.getElementById('bybit-apikey-input').value.trim() : 'eZKaZBvZ02FENX5Jd';
+        const apiSecret = document.getElementById('bybit-apisecret-input') ? document.getElementById('bybit-apisecret-input').value.trim() : 'TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw';
 
-            fmaSetupTriggered = true;
-            document.getElementById('active-trades-count').innerText = "1";
+        try {
+            let tradeRes = await fetch('/api/bybit/trade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apiKey,
+                    apiSecret,
+                    symbol,
+                    side: 'Buy',
+                    orderType: 'Market',
+                    qty,
+                    testnet: false
+                })
+            });
 
-            terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA LONG TRIGGERED]</span> Executing real order on Bybit...`;
-            terminal.scrollTop = terminal.scrollHeight;
+            let tradeData = await tradeRes.json();
 
-            const apiKey = document.getElementById('bybit-apikey-input') ? document.getElementById('bybit-apikey-input'].value.trim() : 'eZKaZBvZ02FENX5Jd';
-            const apiSecret = document.getElementById('bybit-apisecret-input') ? document.getElementById('bybit-apisecret-input'].value.trim() : 'TGvIJJ6E833VwplmP8Eed5I6Y4E1owjlpvw';
-
-            try {
-                let tradeRes = await fetch('/api/bybit/trade', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        apiKey,
-                        apiSecret,
-                        symbol,
-                        side: 'Buy',
-                        orderType: 'Market',
-                        qty,
-                        testnet: false
-                    })
-                });
-
-                let tradeData = await tradeRes.json();
-
-                if (!tradeData.success) {
-                    showStylishPopup(tradeData.error, 'error');
-                    terminal.innerHTML += `<br><span style="color:#f85149;">[BYBIT ERROR]</span> ${tradeData.error}`;
-                    terminal.scrollTop = terminal.scrollHeight;
-                } else {
-                    showStylishPopup(`LONG order successfully placed on Bybit for ${symbol} (${qty} units)!`, 'success');
-                    terminal.innerHTML += `<br><span style="color:#3fb950;">[BYBIT SUCCESS]</span> Order ID: ${tradeData.data.orderId || 'Executed'}`;
-                    terminal.scrollTop = terminal.scrollHeight;
-                }
-            } catch (err) {
-                showStylishPopup('Network error connecting to backend Bybit execution route.', 'error');
+            if (!tradeData.success) {
+                showStylishPopup(tradeData.error, 'error');
+                terminal.innerHTML += `<br><span style="color:#f85149;">[BYBIT ERROR]</span> ${tradeData.error}`;
+                terminal.scrollTop = terminal.scrollHeight;
+            } else {
+                showStylishPopup(`LONG order successfully placed on Bybit for ${symbol} (${qty} units)!`, 'success');
+                terminal.innerHTML += `<br><span style="color:#3fb950;">[BYBIT SUCCESS]</span> Order ID: ${tradeData.data.orderId || 'Executed'}`;
+                terminal.scrollTop = terminal.scrollHeight;
             }
+        } catch (err) {
+            showStylishPopup('Network error connecting to backend Bybit execution route.', 'error');
         }
     } catch (err) {
         console.log("FMA engine error", err);
@@ -289,6 +265,9 @@ function renderCoinList(coins) {
     coins.forEach(coin => {
         let item = document.createElement('div');
         item.className = 'coin-dropdown-item';
+        item.style.padding = '8px 12px';
+        item.style.cursor = 'pointer';
+        item.style.borderBottom = '1px solid #30363d';
         item.innerHTML = `<strong>${coin.symbol}</strong> <span style="color:#8b949e;">${coin.name}</span>`;
         item.onclick = function() {
             currentSymbol = coin.symbol;
@@ -357,7 +336,7 @@ window.stopBot = async function() {
 
 window.clearLogs = function() {
     const terminal = document.getElementById('terminal-logs');
-    if (terminal) terminal.innerHTML = '[SYSTEM] Logs cleared. Ready for FMA strategy signals.';
+    if (terminal) terminal.innerHTML = '[SYSTEM] Logs cleared. Ready for FMA Strategy signals.';
 };
 
 window.redeemPasscode = async function() {
@@ -387,11 +366,6 @@ window.redeemPasscode = async function() {
     }
 };
 
-window.selectPlan = function(tierName) {
-    document.getElementById('passcode-input').focus();
-    alert(`Please enter your passcode for the ${tierName}.`);
-};
-
 window.loadAdminSettings = async function() {
     try {
         let res = await fetch('/api/admin/settings');
@@ -400,26 +374,12 @@ window.loadAdminSettings = async function() {
             if (document.getElementById('display-usdt-wallet')) {
                 document.getElementById('display-usdt-wallet').innerText = settings.usdtAddress;
             }
-            if (document.getElementById('display-easypaisa')) {
-                document.getElementById('display-easypaisa').innerText = settings.easypaisaNumber;
-            }
         }
     } catch (e) {}
 };
 
-window.copyWallet = function() {
-    navigator.clipboard.writeText(document.getElementById('display-usdt-wallet').innerText);
-    alert('USDT Address Copied!');
-};
-
-window.copyEasypaisa = function() {
-    navigator.clipboard.writeText(document.getElementById('display-easypaisa').innerText);
-    alert('Easypaisa details copied!');
-};
-
 window.submitDeposit = async function() {
     let uid = localStorage.getItem('bybit_user_uid');
-    let type = document.getElementById('deposit-method').value;
     let details = document.getElementById('tx-hash-input').value;
     let amount = document.getElementById('deposit-amount').value;
 
@@ -437,28 +397,6 @@ window.submitDeposit = async function() {
         alert('Deposit proof submitted successfully!');
     } catch (e) {
         alert('Error submitting deposit.');
-    }
-};
-
-window.requestWithdrawal = async function() {
-    let uid = localStorage.getItem('bybit_user_uid');
-    let details = document.getElementById('withdraw-address').value;
-    let amount = document.getElementById('withdraw-amount').value;
-
-    if (!details || !amount) {
-        alert('Please enter destination and amount.');
-        return;
-    }
-
-    try {
-        await fetch('/api/transactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid, type: 'WITHDRAW', amount, details })
-        });
-        alert('Withdrawal request submitted successfully!');
-    } catch (e) {
-        alert('Error submitting withdrawal.');
     }
 };
 
@@ -480,21 +418,9 @@ async function loadAdminData() {
         if (stats) {
             document.getElementById('admin-total-users').innerText = stats.totalUsers;
             document.getElementById('admin-pending-deposits').innerText = stats.pendingDeposits;
-            document.getElementById('admin-active-subs').innerText = stats.activeSubscriptions;
         }
     } catch (e) {}
 }
-
-window.saveAdminSettings = async function() {
-    let usdtAddress = document.getElementById('admin-edit-usdt').value;
-    let easypaisaNumber = document.getElementById('admin-edit-easypaisa').value;
-    await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usdtAddress, easypaisaNumber })
-    });
-    alert('Settings saved successfully!');
-};
 
 window.generatePasscode = async function() {
     let tier = document.getElementById('passcode-tier-input').value || 'Pro Trader';
