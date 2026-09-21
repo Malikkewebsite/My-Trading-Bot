@@ -15,12 +15,19 @@ let accessCodes = {};
 let transactions = [];
 let usersCount = 1;
 
-// --- BYBIT REAL EXCHANGE ORDER EXECUTION ROUTE ---
-app.post('/api/bybit/trade', async (req, res) => {
-    const { apiKey, apiSecret, symbol, side, orderType, qty, price, testnet } = req.body;
+// --- SECURE BACKEND BYBIT API EXECUTION ---
+// Aapke diye gaye backend secure config se keys fetch hongi ya environment variables se
+const DEFAULT_BYBIT_KEY = process.env.BYBIT_API_KEY || 'YOUR_BACKEND_BYBIT_API_KEY';
+const DEFAULT_BYBIT_SECRET = process.env.BYBIT_API_SECRET || 'YOUR_BACKEND_BYBIT_API_SECRET';
 
-    if (!apiKey || !apiSecret) {
-        return res.status(400).json({ success: false, error: 'Bybit API Key and Secret are required in settings.' });
+app.post('/api/bybit/trade', async (req, res) => {
+    const { symbol, side, orderType, qty, price, testnet } = req.body;
+
+    const apiKey = DEFAULT_BYBIT_KEY;
+    const apiSecret = DEFAULT_BYBIT_SECRET;
+
+    if (!apiKey || apiKey.includes('YOUR_BACKEND')) {
+        return res.status(400).json({ success: false, error: 'Backend Bybit API keys not configured in environment.' });
     }
 
     const baseUrl = testnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
@@ -56,30 +63,14 @@ app.post('/api/bybit/trade', async (req, res) => {
             body: bodyString
         });
 
-        const textResponse = await response.text();
-        let data;
-        try {
-            data = JSON.parse(textResponse);
-        } catch (e) {
-            return res.status(400).json({
-                success: false,
-                error: `Invalid JSON response from Bybit: ${textResponse.substring(0, 100)}`
-            });
-        }
-
+        const data = await response.json();
         if (data.retCode !== 0) {
-            return res.status(400).json({
-                success: false,
-                error: `Bybit Error (${data.retCode}): ${data.retMsg}`
-            });
+            return res.status(400).json({ success: false, error: `Bybit Error (${data.retCode}): ${data.retMsg}` });
         }
 
         res.json({ success: true, data: data.result });
     } catch (err) {
-        res.status(500).json({
-            success: false,
-            error: err.message || 'Failed to connect to Bybit exchange server.'
-        });
+        res.status(500).json({ success: false, error: err.message || 'Failed to connect to Bybit server.' });
     }
 });
 
@@ -99,7 +90,7 @@ app.get('/api/admin/stats', (req, res) => {
 
 app.post('/api/codes', (req, res) => {
     const code = 'PRO-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    accessCodes[code] = { tier: req.body.tier || 'Pro Trader', used: false };
+    accessCodes[code] = { tier: req.body.tier || 'Starter Plan', used: false };
     res.json({ code });
 });
 
