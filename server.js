@@ -12,7 +12,6 @@ try {
     console.error("Static folder error:", e);
 }
 
-// Tumhari Gate.io ki Real API Keys yahan directly embed kar di gayi hain
 const DEFAULT_GATE_KEY = "571cbdc229c84e7056d4d6b160fc23b4";
 const DEFAULT_GATE_SECRET = "b292e3d2aceae77273c78945ccf1955488abe3a7151e13f7b91bab53de8d45d3";
 
@@ -82,6 +81,35 @@ function calculateEMA(data, period) {
     return emaArray;
 }
 
+async function getGateAccountBalance() {
+    const host = 'api.gateio.ws';
+    const prefix = '/api/v4';
+    const url = '/spot/accounts';
+    const method = 'GET';
+    const t = Math.floor(Date.now() / 1000).toString();
+
+    const signatureString = `${method}\n${prefix + url}\n\n\n${t}`;
+    const signature = crypto.createHmac('sha512', DEFAULT_GATE_SECRET).update(signatureString).digest('hex');
+
+    const response = await fetch(`https://${host}${prefix}${url}`, {
+        method: method,
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'KEY': DEFAULT_GATE_KEY,
+            'Timestamp': t,
+            'SIGN': signature
+        }
+    });
+
+    const accounts = await response.json();
+    if (Array.isArray(accounts)) {
+        const usdtAcc = accounts.find(acc => acc.currency === 'USDT');
+        return usdtAcc ? parseFloat(usdtAcc.available || 0) : 0;
+    }
+    return 0;
+}
+
 async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '0') {
     const host = 'api.gateio.ws';
     const prefix = '/api/v4';
@@ -130,11 +158,11 @@ async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '
     try {
         data = JSON.parse(textResponse);
     } catch (e) {
-        throw new Error(`Exchange raw response error: ${textResponse.substring(0, 100)}`);
+        throw new Error(`Exchange Error: Raw response error: ${textResponse.substring(0, 100)}`);
     }
 
     if (response.status !== 200 && response.status !== 201) {
-        throw new Error(data.message || JSON.stringify(data));
+        throw new Error(`Exchange Error: ${data.message || JSON.stringify(data)}`);
     }
     return data;
 }
@@ -142,128 +170,122 @@ async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '
 app.post('/api/gate/trade', async (req, res) => {
     try {
         const combinedData = { ...(req.query || {}), ...(req.body || {}) };
-        const apiKey = DEFAULT_GATE_KEY;
-        const apiSecret = DEFAULT_GATE_SECRET;
-
-        if (!apiKey || !apiSecret) {
-            return res.status(400).json({ success: false, error: 'API keys are missing.' });
-        }
-
+        
         let rawQty = findAmount(combinedData);
         if (rawQty === null || isNaN(rawQty) || rawQty <= 0) rawQty = 5;
         if (rawQty < 3) rawQty = 3;
 
         const symbol = combinedData.symbol || 'BTC_USDT';
 
-        if (botState.isRunning) {
-            return res.json({ success: true, message: 'Bot is already running and monitoring fresh FVG + 50 EMA strategy.' });
+        // Step 1: Exchange Balance Verification Check
+        const availableBalance = await getGateAccountBalance();
+        if (availableBalance < rawQty) {
+            return res.status(400).json({ 
+                success: false, 
+                error: `Exchange Error: Insufficient balance available in your account. Required: $${rawQty}, Available: $${availableBalance.toFixed(2)}` 
+            });
         }
+
+        // Step 2: Strategy Validation Check (Fetching Candles & Evaluating FVG + 50 EMA)
+        const host = 'api.gateio.ws';
+        const prefix = '/api/v4';
+        const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${symbol}&interval=15m&limit=100`);
+        const klines = await klinesRes.json();
+
+        if (!Array.isArray(klines) || klines.length < 55) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Exchange Error: Strategy conditions not met yet. Waiting for market setup..." 
+            });
+        }
+
+        const formattedCandles = klines.map(k => ({
+            time: k[0],
+            open: parseFloat(k[5]),
+            high: parseFloat(k[3]),
+            low: parseFloat(k[4]),
+            close: parseFloat(k[2])
+        }));
+
+        const closes = formattedCandles.map(c => c.close);
+        const ema50Array = calculateEMA(closes, 50);
+
+        let validSetupFound = false;
+        let matchedFvgTime = null;
+
+        for (let i = 2; i < formattedCandles.length - 1; i++) {
+            const c1 = formattedCandles[i - 2];
+            const c3 = formattedCandles[i];
+
+            if (c3.low > c1.high) {
+                const fvgBottom = c1.high;
+                const fvgTop = c3.low;
+                const fvgTimestamp = c3.time;
+
+                let isAlreadyMitigatedBefore = false;
+                let touchFound = false;
+                let targetTestCandle = null;
+                let targetEma = 0;
+
+                for (let j = i + 1; j < formattedCandles.length; j++) {
+                    const testCandle = formattedCandles[j];
+                    const currentEMA = ema50Array[j];
+                    const touchedFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
+
+                    if (!touchFound) {
+                        if (touchedFvg) {
+                            touchFound = true;
+                            targetTestCandle = testCandle;
+                            targetEma = currentEMA;
+                        }
+                    } else {
+                        if (testCandle.low < fvgBottom) {
+                            isAlreadyMitigatedBefore = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (touchFound && !isAlreadyMitigatedBefore && targetTestCandle) {
+                    const touchedFvgNow = targetTestCandle.low <= fvgTop && targetTestCandle.high >= fvgBottom;
+                    const touchedEmaNow = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003 || 
+                                          (targetTestCandle.low <= targetEma && targetTestCandle.high >= targetEma);
+
+                    if (touchedFvgNow && touchedEmaNow) {
+                        const isGreen = targetTestCandle.close > targetTestCandle.open;
+                        const emaNotBroken = targetTestCandle.low >= (targetEma * 0.995);
+
+                        if (isGreen && emaNotBroken) {
+                            validSetupFound = true;
+                            matchedFvgTime = fvgTimestamp;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (validSetupFound) break;
+        }
+
+        // Agar strategy condition meet nahi hui toh error return karein taake bina setup ke trade na uthe
+        if (!validSetupFound) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Exchange Error: Strategy conditions not met yet. Waiting for market setup..." 
+            });
+        }
+
+        // Step 3: Sab conditions pass hone par order place karein
+        await executeGateOrder(symbol, 'buy', 'market', rawQty);
 
         botState.isRunning = true;
         botState.symbol = symbol;
         botState.capital = rawQty;
+        botState.lastTradedFvgTime = matchedFvgTime;
 
-        botState.intervalId = setInterval(async () => {
-            if (!botState.isRunning) {
-                clearInterval(botState.intervalId);
-                return;
-            }
-
-            try {
-                const host = 'api.gateio.ws';
-                const prefix = '/api/v4';
-                const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${botState.symbol}&interval=15m&limit=100`);
-                const klines = await klinesRes.json();
-
-                if (!Array.isArray(klines) || klines.length < 55) return;
-
-                const formattedCandles = klines.map(k => ({
-                    time: k[0],
-                    open: parseFloat(k[5]),
-                    high: parseFloat(k[3]),
-                    low: parseFloat(k[4]),
-                    close: parseFloat(k[2])
-                }));
-
-                const closes = formattedCandles.map(c => c.close);
-                const ema50Array = calculateEMA(closes, 50);
-
-                let validSetupFound = false;
-                let matchedFvgTime = null;
-
-                for (let i = 2; i < formattedCandles.length - 1; i++) {
-                    const c1 = formattedCandles[i - 2];
-                    const c3 = formattedCandles[i];
-
-                    if (c3.low > c1.high) {
-                        const fvgBottom = c1.high;
-                        const fvgTop = c3.low;
-                        const fvgTimestamp = c3.time;
-
-                        if (botState.lastTradedFvgTime === fvgTimestamp) continue;
-
-                        let isAlreadyMitigatedBefore = false;
-                        let touchFound = false;
-                        let targetTestCandle = null;
-                        let targetEma = 0;
-
-                        for (let j = i + 1; j < formattedCandles.length; j++) {
-                            const testCandle = formattedCandles[j];
-                            const currentEMA = ema50Array[j];
-                            const touchedFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
-
-                            if (!touchFound) {
-                                if (touchedFvg) {
-                                    touchFound = true;
-                                    targetTestCandle = testCandle;
-                                    targetEma = currentEMA;
-                                }
-                            } else {
-                                if (testCandle.low < fvgBottom) {
-                                    isAlreadyMitigatedBefore = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (touchFound && !isAlreadyMitigatedBefore && targetTestCandle) {
-                            const touchedFvgNow = targetTestCandle.low <= fvgTop && targetTestCandle.high >= fvgBottom;
-                            const touchedEmaNow = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003 || 
-                                                  (targetTestCandle.low <= targetEma && targetTestCandle.high >= targetEma);
-
-                            if (touchedFvgNow && touchedEmaNow) {
-                                const isGreen = targetTestCandle.close > targetTestCandle.open;
-                                const emaNotBroken = targetTestCandle.low >= (targetEma * 0.995);
-
-                                if (isGreen && emaNotBroken) {
-                                    validSetupFound = true;
-                                    matchedFvgTime = fvgTimestamp;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (validSetupFound) break;
-                }
-
-                if (!validSetupFound) return;
-
-                botState.lastTradedFvgTime = matchedFvgTime;
-                await executeGateOrder(botState.symbol, 'buy', 'market', botState.capital);
-                
-                botState.isRunning = false;
-                clearInterval(botState.intervalId);
-
-            } catch (loopErr) {
-                console.error("Strategy Loop Error:", loopErr.message);
-            }
-        }, 15000);
-
-        res.json({ success: true, message: 'Bot started successfully. Monitoring fresh unmitigated FVG and 50 EMA strategy conditions...' });
+        res.json({ success: true, message: `Automated order successfully executed for ${symbol.replace('_', '')} with $${rawQty}!` });
 
     } catch (err) {
-        botState.isRunning = false;
-        res.status(500).json({ success: false, error: err.message || 'Failed to start bot.' });
+        res.status(500).json({ success: false, error: err.message || 'Exchange Error: Failed to execute trade.' });
     }
 });
 
@@ -274,7 +296,7 @@ app.post('/api/gate/close-all', async (req, res) => {
 
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
-        if (!apiKey || !apiSecret) return res.status(400).json({ success: false, error: 'API keys missing.' });
+        if (!apiKey || !apiSecret) return res.status(400).json({ success: false, error: 'Exchange Error: API keys missing.' });
 
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
