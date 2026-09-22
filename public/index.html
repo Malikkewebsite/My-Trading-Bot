@@ -117,7 +117,7 @@
             </div>
         </section>
 
-        <!-- Tab 3: Pricing & Activation Plans (Colorful & Detailed Features) -->
+        <!-- Tab 3: Pricing & Activation Plans -->
         <section id="tab-pricing" class="tab-section hidden">
             <h3>👑 Pricing & Activation Plans</h3>
             
@@ -125,7 +125,6 @@
                 ⚠️ <strong>Important Notice:</strong> First you have to contact the admin to get your VIP passcode and unlock the automated algo bot.
             </div>
 
-            <!-- Colorful Detailed Plans -->
             <div style="display: grid; gap: 15px; margin-top: 15px;">
                 <div onclick="selectPlan('Starter Plan', '10')" style="background: #161b22; border: 2px solid #3fb950; padding: 15px; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(63, 185, 80, 0.1);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -155,14 +154,12 @@
                 </div>
             </div>
 
-            <!-- Passcode Activation -->
             <div style="background: #161b22; padding: 15px; border-radius: 10px; margin-top: 15px;">
                 <p style="color: #8b949e; font-size: 14px;">Already received your passcode from admin? Enter it below:</p>
                 <input type="text" id="passcode-input" placeholder="Enter Passcode (e.g. PRO-XXXXXX)..." style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 10px;">
                 <button onclick="redeemPasscode()" style="width: 100%; padding: 12px; background: #1f6feb; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Unlock Pro Access</button>
             </div>
 
-            <!-- WhatsApp Admin Contact Button -->
             <div style="margin-top: 15px; text-align: center;">
                 <a href="https://wa.me/923125124424?text=Hello%20Admin,%20I%20want%20to%20buy%20Crypto%20Bot%20Pro%20access%20passcode." target="_blank" style="display: block; background: #238636; color: #fff; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold;">
                     💬 Contact Admin on WhatsApp (03125124424)
@@ -171,7 +168,7 @@
         </section>
     </div>
 
-    <!-- Master Admin Dashboard Modal (Jaise video mein hai) -->
+    <!-- Master Admin Dashboard Modal -->
     <div id="admin-modal" class="modal-backdrop hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 15px;">
         <div style="background: #161b22; border: 1px solid #30363d; border-radius: 12px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 20px; box-shadow: 0 10px 35px rgba(0,0,0,0.8);">
             
@@ -180,16 +177,13 @@
                 <button onclick="toggleAdminPanelModal()" style="background: none; border: none; color: #8b949e; font-size: 18px; cursor: pointer;">✕</button>
             </div>
 
-            <!-- Admin Login Box -->
             <div id="admin-login-box">
                 <p style="font-size: 13px; color: #8b949e; margin-bottom: 10px;">Enter admin password to manage passcodes and users:</p>
                 <input type="password" id="admin-key-input" placeholder="Enter Admin Secret..." style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 10px;">
                 <button onclick="adminLogin()" style="width: 100%; padding: 12px; background: #238636; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Login Admin</button>
             </div>
 
-            <!-- Admin Full Functional Dashboard -->
             <div id="admin-dashboard-content" class="hidden">
-                <!-- Admin Sub-tabs -->
                 <div style="display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap;">
                     <button onclick="switchAdminTab('passcodes')" class="admin-tab-btn active" style="flex: 1; padding: 8px; background: #1f6feb; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-size: 12px;">Passcodes</button>
                     <button onclick="switchAdminTab('users')" class="admin-tab-btn" style="flex: 1; padding: 8px; background: #21262d; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-size: 12px;">Users</button>
@@ -197,7 +191,6 @@
                     <button onclick="switchAdminTab('bot')" class="admin-tab-btn" style="flex: 1; padding: 8px; background: #21262d; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-size: 12px;">Bot Control</button>
                 </div>
 
-                <!-- Section 1: Passcodes Generator -->
                 <div id="admin-section-passcodes" class="admin-sub-section">
                     <h4 style="margin-bottom: 8px; color: #3fb950;">Live One-Time Short Passcodes</h4>
                     <select id="passcode-tier-input" style="width: 100%; padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 10px;">
@@ -209,7 +202,6 @@
                     <div id="generated-code-display" style="background: #0d1117; padding: 10px; border-radius: 6px; font-size: 13px; color: #3fb950; margin-bottom: 15px; text-align: center;">No code generated yet.</div>
                 </div>
 
-                <!-- Section 2: User Control & Wallet Adjustments -->
                 <div id="admin-section-users" class="admin-sub-section hidden">
                     <h4 style="margin-bottom: 8px; color: #58a6ff;">User Control & Wallet Adjustments</h4>
                     <div style="background: #0d1117; padding: 10px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
@@ -224,7 +216,6 @@
                     </div>
                 </div>
 
-                <!-- Section 3: Financials & Pending Deposits -->
                 <div id="admin-section-financials" class="admin-sub-section hidden">
                     <h4 style="margin-bottom: 8px; color: #d29922;">Pending Deposits & Withdrawals</h4>
                     <div id="admin-deposits-list" style="background: #0d1117; padding: 10px; border-radius: 6px; font-size: 12px; color: #8b949e; text-align: center;">
@@ -232,7 +223,6 @@
                     </div>
                 </div>
 
-                <!-- Section 4: Bot Control & Rules -->
                 <div id="admin-section-bot" class="admin-sub-section hidden">
                     <h4 style="margin-bottom: 8px; color: #f85149;">Master Bot & Risk Rules</h4>
                     <div style="margin-bottom: 10px;">
@@ -249,6 +239,16 @@
         </div>
     </div>
 
+    <!-- LocalStorage Persistence script integration -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const savedLogs = localStorage.getItem("crypto_bot_logs");
+            if (savedLogs) {
+                const logsDiv = document.getElementById("terminal-logs");
+                if(logsDiv) logsDiv.innerHTML = savedLogs;
+            }
+        });
+    </script>
     <script src="script.js"></script>
 </body>
 </html>
