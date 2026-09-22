@@ -49,7 +49,7 @@
                     <span id="coin-change" style="font-size: 14px;">+0.00%</span>
                 </div>
             </div>
-            <div style="font-size: 12px; color: #8b949e; margin-bottom: 10px;">15m Live Candle (FMA Active)</div>
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 10px;">15m Live Candle (Strict FMA Strategy Filter Active)</div>
 
             <div id="tv-chart-frame" style="width: 100%; height: 350px; background: #010409; border-radius: 10px; margin-bottom: 20px; border: 1px solid #30363d;"></div>
 
@@ -59,7 +59,7 @@
                 <div class="form-group" style="margin-top: 10px;">
                     <label style="color: #8b949e; font-size: 13px;">Strategy Mode</label>
                     <select id="strategy-select" style="width: 100%; padding: 10px; background: #010409; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
-                        <option value="FMA Strategy">FMA Strategy</option>
+                        <option value="FMA Strategy">FMA Strategy (Strict Setup Required)</option>
                     </select>
                 </div>
 
@@ -103,11 +103,7 @@
                         </thead>
                         <tbody id="active-holding-tbody">
                             <tr>
-                                <td style="padding: 8px;">STXUSDT</td>
-                                <td style="padding: 8px;">$0.33120</td>
-                                <td style="padding: 8px;">$0.33520</td>
-                                <td style="padding: 8px;">$0.31550 / $0.34550</td>
-                                <td style="padding: 8px; color: #3fb950;">+$0.00 (+0.00%)</td>
+                                <td colspan="5" style="padding: 12px; text-align: center; color: #8b949e;">No active holdings. Start bot to monitor market.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -128,9 +124,7 @@
                         </thead>
                         <tbody id="trade-signals-tbody">
                             <tr>
-                                <td style="padding: 8px;">STXUSDT</td>
-                                <td style="padding: 8px; color: #3fb950;">+$0.68</td>
-                                <td style="padding: 8px;">$51.38</td>
+                                <td colspan="3" style="padding: 12px; text-align: center; color: #8b949e;">No trade signals yet.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -143,7 +137,7 @@
                     <button onclick="clearLogs()" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">Clear Logs</button>
                 </div>
                 <div id="terminal-logs" style="font-family: monospace; font-size: 12px; color: #3fb950; height: 120px; overflow-y: auto;">
-                    [SYSTEM] FMA Strategy initialized with backend execution.<br>Monitoring live market setups...
+                    [SYSTEM] FMA Strategy engine initialized with strict confirmation filters.<br>Waiting for valid market setup...
                 </div>
             </div>
         </section>
@@ -157,7 +151,7 @@
                     <option value="USDT">USDT (TRC20)</option>
                     <option value="Easypaisa">Easypaisa (03125124424)</option>
                 </select>
-                <p style="font-size: 13px; color: #8b949e;">Official Address: <span id="display-usdt-wallet" style="color: #fff;">Loading...</span></p>
+                <p style="font-size: 13px; color: #8b949e;">Official Address: <span id="display-usdt-wallet" style="color: #fff;">TRC20: TTheOfficialUSDTWalletAddress12345</span></p>
                 <div class="form-group" style="margin-top: 10px;">
                     <label style="color: #8b949e; font-size: 13px;">Amount ($)</label>
                     <input type="number" id="deposit-amount" placeholder="Enter amount..." style="width: 100%; padding: 10px; background: #010409; color: #fff; border: 1px solid #30363d; border-radius: 6px;">
@@ -250,37 +244,17 @@
                     
                     <div style="background: #010409; border: 1px solid #30363d; border-radius: 8px; padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <div style="font-size: 12px; color: #3fb950; font-weight: bold;">🕒 20 Seconds Test Code (T20-X89)</div>
-                            <span id="code-t20" style="font-family: monospace; font-size: 14px; color: #fff;">T20-D6D</span> <span style="font-size: 11px; color: #8b949e;">(20 Seconds Test)</span>
+                            <div style="font-size: 12px; color: #3fb950; font-weight: bold;">🕒 20 Seconds Test Code (T20-D6D)</div>
+                            <span style="font-family: monospace; font-size: 14px; color: #fff;">T20-D6D</span>
                         </div>
                         <button onclick="copyAdminCode('T20-D6D')" style="background: #d29922; color: #0d1117; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer;">📋 COPY</button>
                     </div>
 
-                    <div style="font-size: 12px; color: #8b949e; margin-bottom: 5px;">📅 7 Days Access Codes (e.g. 7D-K9P2):</div>
+                    <div style="font-size: 12px; color: #8b949e; margin-bottom: 5px;">📅 7 Days Access Codes:</div>
                     <div style="display: grid; gap: 6px; margin-bottom: 12px;">
-                        <div style="display: flex; justify-content: space-between; align-items: centerex; background: #010409; padding: 8px; border-radius: 6px; border: 1px solid #30363d;">
-                            <span style="font-family: monospace; font-size: 12px; color: #58a6ff;">7D-88DH3T <span style="color:#8b949e;">(7 Days Access)</span></span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: #010409; padding: 8px; border-radius: 6px; border: 1px solid #30363d;">
+                            <span style="font-family: monospace; font-size: 12px; color: #58a6ff;">7D-88DH3T</span>
                             <button onclick="copyAdminCode('7D-88DH3T')" style="background: #d29922; color: #0d1117; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer;">📋 COPY</button>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: #010409; padding: 8px; border-radius: 6px; border: 1px solid #30363d;">
-                            <span style="font-family: monospace; font-size: 12px; color: #58a6ff;">7D-AVAL8U <span style="color:#8b949e;">(7 Days Access)</span></span>
-                            <button onclick="copyAdminCode('7D-AVAL8U')" style="background: #d29922; color: #0d1117; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer;">📋 COPY</button>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: #010409; padding: 8px; border-radius: 6px; border: 1px solid #30363d;">
-                            <span style="font-family: monospace; font-size: 12px; color: #58a6ff;">7D-Q5TNDK <span style="color:#8b949e;">(7 Days Access)</span></span>
-                            <button onclick="copyAdminCode('7D-Q5TNDK')" style="background: #d29922; color: #0d1117; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer;">📋 COPY</button>
-                        </div>
-                    </div>
-
-                    <div style="font-size: 12px; color: #8b949e; margin-bottom: 5px;">🔥 30 Days VIP Access Codes (e.g. 30D-R4T8):</div>
-                    <div style="display: grid; gap: 6px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: #010409; padding: 8px; border-radius: 6px; border: 1px solid #30363d;">
-                            <span style="font-family: monospace; font-size: 12px; color: #d29922;">30D-55K8EB <span style="color:#8b949e;">(30 Days VIP)</span></span>
-                            <button onclick="copyAdminCode('30D-55K8EB')" style="background: #d29922; color: #0d1117; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer;">📋 COPY</button>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: #010409; padding: 8px; border-radius: 6px; border: 1px solid #30363d;">
-                            <span style="font-family: monospace; font-size: 12px; color: #d29922;">30D-HPUPY2 <span style="color:#8b949e;">(30 Days VIP)</span></span>
-                            <button onclick="copyAdminCode('30D-HPUPY2')" style="background: #d29922; color: #0d1117; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer;">📋 COPY</button>
                         </div>
                     </div>
                 </div>
@@ -301,11 +275,10 @@
                             <tbody id="admin-users-tbody">
                                 <tr>
                                     <td id="admin-table-uid" style="padding: 8px; font-family: monospace;">UID-781988</td>
-                                    <td id="admin-table-bal" style="padding: 8px;">$104.60</td>
+                                    <td id="admin-table-bal" style="padding: 8px;">$500.00</td>
                                     <td style="padding: 8px; color: #3fb950; font-weight: bold;">Active</td>
                                     <td style="padding: 8px;">
-                                        <button onclick="editUserBalance()" style="background: #1f6feb; color: #fff; border: none; padding: 3px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; margin-right: 4px;">EDIT ✏️</button>
-                                        <button onclick="freezeUser()" style="background: #da3633; color: #fff; border: none; padding: 3px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">Freeze</button>
+                                        <button onclick="editUserBalance()" style="background: #1f6feb; color: #fff; border: none; padding: 3px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">EDIT ✏️</button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -320,16 +293,14 @@
                         <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #c9d1d9; text-align: left;">
                             <thead>
                                 <tr style="border-bottom: 1px solid #30363d; color: #8b949e;">
-                                    <th style="padding: 6px;">Type</th>
+                                    <th style="padding: 6px;">Type / UID</th>
                                     <th style="padding: 6px;">Amount</th>
                                     <th style="padding: 6px;">Details</th>
                                     <th style="padding: 6px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="admin-financials-tbody">
-                                <tr>
-                                    <td colspan="4" style="padding: 12px; text-align: center; color: #8b949e;">No pending requests.</td>
-                                </tr>
+                                <!-- Loaded dynamically -->
                             </tbody>
                         </table>
                     </div>
@@ -338,21 +309,13 @@
                 <!-- 4. Bot Control Sub-Section -->
                 <div id="admin-section-bot" class="admin-sub-section hidden">
                     <div style="font-size: 13px; font-weight: bold; color: #f0f6fc; margin-bottom: 10px;">Master Bot & Risk Rules</div>
-                    
                     <div style="background: #010409; padding: 12px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 12px;">
-                        <label style="font-size: 12px; color: #8b949e; display: block; margin-bottom: 6px;">Global System Emergency Switch</label>
-                        <button onclick="pauseAllBots()" style="width: 100%; padding: 10px; background: #da3633; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;">Pause All 🛑</button>
+                        <button onclick="pauseAllBots()" style="width: 100%; padding: 10px; background: #da3633; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;">Pause All Bots 🛑</button>
                     </div>
-
-                    <div style="background: #010409; padding: 12px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 12px;">
-                        <label style="font-size: 12px; color: #8b949e; display: block; margin-bottom: 6px;">Max Allowed Risk Per Trade (%) Cap</label>
-                        <input type="number" id="admin-risk-cap" value="10" style="width: 100%; padding: 8px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; font-size: 13px;">
-                    </div>
-
                     <div style="background: #010409; padding: 12px; border-radius: 8px; border: 1px solid #30363d;">
-                        <label style="font-size: 12px; color: #8b949e; display: block; margin-bottom: 6px;">Add New Spot Pair (OKX Format)</label>
+                        <label style="font-size: 12px; color: #8b949e; display: block; margin-bottom: 6px;">Add New Spot Pair</label>
                         <div style="display: flex; gap: 6px;">
-                            <input type="text" id="admin-new-pair" placeholder="e.g. MOODENG-USDT" style="flex: 1; padding: 8px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; font-size: 12px;">
+                            <input type="text" id="admin-new-pair" placeholder="e.g. MOODENGUSDT" style="flex: 1; padding: 8px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; font-size: 12px;">
                             <button onclick="addNewTradingPair()" style="background: #238636; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;">Add</button>
                         </div>
                     </div>
@@ -363,7 +326,7 @@
                     <div style="font-size: 13px; font-weight: bold; color: #f0f6fc; margin-bottom: 10px;">Live Running Trades Monitoring</div>
                     <div style="background: #010409; padding: 12px; border-radius: 8px; border: 1px solid #30363d;">
                         <div id="admin-active-trades-panel" style="font-size: 12px; color: #c9d1d9;">
-                            <p style="color: #8b949e; margin-bottom: 10px;">No active trade currently running on exchange backend.</p>
+                            <p style="color: #8b949e; margin-bottom: 10px;">No active trade currently running.</p>
                         </div>
                     </div>
                 </div>
@@ -371,39 +334,6 @@
         </div>
     </div>
 
-    <!-- LocalStorage & Persistence Script -->
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const savedLogs = localStorage.getItem("crypto_bot_logs");
-            if (savedLogs) {
-                const logsDiv = document.getElementById("terminal-logs");
-                if(logsDiv) logsDiv.innerHTML = savedLogs;
-            }
-            const savedHoldings = localStorage.getItem("active_holdings_data");
-            if (savedHoldings) {
-                const holdingTbody = document.getElementById("active-holding-tbody");
-                if(holdingTbody) holdingTbody.innerHTML = savedHoldings;
-            }
-            const savedSignals = localStorage.getItem("trade_signals_data");
-            if (savedSignals) {
-                const signalsTbody = document.getElementById("trade-signals-tbody");
-                if(signalsTbody) signalsTbody.innerHTML = savedSignals;
-            }
-        });
-
-        function saveStateToLocalStorage() {
-            const logsDiv = document.getElementById("terminal-logs");
-            if(logsDiv) localStorage.setItem("crypto_bot_logs", logsDiv.innerHTML);
-            
-            const holdingTbody = document.getElementById("active-holding-tbody");
-            if(holdingTbody) localStorage.setItem("active_holdings_data", holdingTbody.innerHTML);
-
-            const signalsTbody = document.getElementById("trade-signals-tbody");
-            if(signalsTbody) localStorage.setItem("trade_signals_data", signalsTbody.innerHTML);
-        }
-
-        setInterval(saveStateToLocalStorage, 2000);
-    </script>
     <script src="script.js"></script>
 </body>
 </html>
