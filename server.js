@@ -40,6 +40,22 @@ app.get('/api/deposit/info', (req, res) => {
     res.json({ success: true, address: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345' });
 });
 
+// Gate.io All Spot Currency Pairs API for Search Bar
+app.get('/api/gate/pairs', async (req, res) => {
+    try {
+        const response = await fetch('https://api.gateio.ws/api/v4/spot/currency_pairs');
+        const pairs = await response.json();
+        if (Array.isArray(pairs)) {
+            // Format pairs for frontend search (e.g. BTC_USDT, ETH_USDT)
+            const symbolList = pairs.map(p => p.id || p.base + '_' + p.quote);
+            return res.json({ success: true, pairs: symbolList });
+        }
+        res.json({ success: false, pairs: [] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to fetch Gate.io pairs' });
+    }
+});
+
 app.post('/api/admin/passcode', (req, res) => {
     const { plan } = req.body || {};
     const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -164,6 +180,86 @@ async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '
     return data;
 }
 
+async function checkAndExecuteStrategy(symbol, rawQty) {
+    const host = 'api.gateio.ws';
+    const prefix = '/api/v4';
+    const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${symbol}&interval=15m&limit=120`);
+    const klines = await klinesRes.json();
+
+    if (!Array.isArray(klines) || klines.length < 60) {
+        return { success: false, error: "Not enough candles data." };
+    }
+
+    const formattedCandles = klines.map(k => ({
+        time: k[0],
+        open: parseFloat(k[5]),
+        high: parseFloat(k[3]),
+        low: parseFloat(k[4]),
+        close: parseFloat(k[2])
+    }));
+
+    const closes = formattedCandles.map(c => c.close);
+    const ema50Array = calculateEMA(closes, 50);
+
+    let validSetupFound = false;
+    let matchedFvgTime = null;
+
+    for (let i = 2; i < formattedCandles.length - 1; i++) {
+        const c1 = formattedCandles[i - 2];
+        const c2 = formattedCandles[i - 1];
+        const c3 = formattedCandles[i];
+
+        if (c3.low > c1.high) {
+            const fvgBottom = c1.high;
+            const fvgTop = c3.low;
+            const fvgSize = fvgTop - fvgBottom;
+            const c2Body = Math.abs(c2.close - c2.open);
+            const c2Range = c2.high - c2.low;
+
+            if (fvgSize > (c3.close * 0.0005) && c2Range > 0 && (c2Body / c2Range) >= 0.5) {
+                const fvgTimestamp = c3.time;
+                let touchFound = false;
+                let targetTestCandle = null;
+                let targetEma = 0;
+
+                for (let j = i + 1; j < formattedCandles.length; j++) {
+                    const testCandle = formattedCandles[j];
+                    const currentEMA = ema50Array[j];
+                    const touchedFvg = testCandle.low <= fvgTop + (fvgSize * 0.2) && testCandle.low >= fvgBottom - (fvgSize * 0.2);
+
+                    if (touchedFvg) {
+                        touchFound = true;
+                        targetTestCandle = testCandle;
+                        targetEma = currentEMA;
+                        break;
+                    }
+                }
+
+                if (touchFound && targetTestCandle) {
+                    const isStrongGreen = targetTestCandle.close > targetTestCandle.open && (targetTestCandle.close - targetTestCandle.open) > (targetTestCandle.high - targetTestCandle.low) * 0.4;
+                    const strictNearEma = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003;
+
+                    if (isStrongGreen && strictNearEma) {
+                        validSetupFound = true;
+                        matchedFvgTime = fvgTimestamp;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!validSetupFound) {
+        return { success: false, error: "Strategy conditions not met yet." };
+    }
+
+    // Execute order if setup found
+    const orderResult = await executeGateOrder(symbol, 'buy', 'market', rawQty);
+    const executedPrice = parseFloat(orderResult.price || orderResult.fill_price || formattedCandles[formattedCandles.length - 1].close);
+
+    return { success: true, entryPrice: executedPrice, fvgTime: matchedFvgTime };
+}
+
 app.post('/api/gate/trade', async (req, res) => {
     try {
         const combinedData = { ...(req.query || {}), ...(req.body || {}) };
@@ -174,109 +270,60 @@ app.post('/api/gate/trade', async (req, res) => {
 
         const symbol = combinedData.symbol || 'BTC_USDT';
 
-        // Step 1: Exchange Balance Verification Check
+        // Balance Check
         const availableBalance = await getGateAccountBalance();
         if (availableBalance < rawQty && availableBalance > 0) {
             return res.status(400).json({ 
                 success: false, 
-                error: `Exchange Error: Insufficient balance available in your account. Required: $${rawQty}, Available: $${availableBalance.toFixed(2)}` 
+                error: `Exchange Error: Insufficient balance available. Required: $${rawQty}, Available: $${availableBalance.toFixed(2)}` 
             });
         }
 
-        // Step 2: Ultra-Strict Strategy Validation Check (FVG + 50 EMA Confluence)
-        const host = 'api.gateio.ws';
-        const prefix = '/api/v4';
-        const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${symbol}&interval=15m&limit=120`);
-        const klines = await klinesRes.json();
+        // Try immediate execution check
+        const result = await checkAndExecuteStrategy(symbol, rawQty);
+        
+        if (!result.success) {
+            // If setup not met right now, start background loop to keep checking automatically!
+            botState.isRunning = true;
+            botState.symbol = symbol;
+            botState.capital = rawQty;
 
-        if (!Array.isArray(klines) || klines.length < 60) {
-            return res.status(400).json({ 
-                success: false, 
-                error: "Exchange Error: Strategy conditions not met yet. Waiting for strict FVG + EMA setup..." 
-            });
-        }
-
-        const formattedCandles = klines.map(k => ({
-            time: k[0],
-            open: parseFloat(k[5]),
-            high: parseFloat(k[3]),
-            low: parseFloat(k[4]),
-            close: parseFloat(k[2])
-        }));
-
-        const closes = formattedCandles.map(c => c.close);
-        const ema50Array = calculateEMA(closes, 50);
-
-        let validSetupFound = false;
-        let matchedFvgTime = null;
-
-        for (let i = 2; i < formattedCandles.length - 1; i++) {
-            const c1 = formattedCandles[i - 2];
-            const c2 = formattedCandles[i - 1];
-            const c3 = formattedCandles[i];
-
-            // Strict Bullish FVG: Gap must be prominent and c2 must be a strong momentum candle
-            if (c3.low > c1.high) {
-                const fvgBottom = c1.high;
-                const fvgTop = c3.low;
-                const fvgSize = fvgTop - fvgBottom;
-                const c2Body = Math.abs(c2.close - c2.open);
-                const c2Range = c2.high - c2.low;
-
-                if (fvgSize > (c3.close * 0.0005) && c2Range > 0 && (c2Body / c2Range) >= 0.5) {
-                    const fvgTimestamp = c3.time;
-                    let touchFound = false;
-                    let targetTestCandle = null;
-                    let targetEma = 0;
-
-                    for (let j = i + 1; j < formattedCandles.length; j++) {
-                        const testCandle = formattedCandles[j];
-                        const currentEMA = ema50Array[j];
-                        const touchedFvg = testCandle.low <= fvgTop + (fvgSize * 0.2) && testCandle.low >= fvgBottom - (fvgSize * 0.2);
-
-                        if (touchedFvg) {
-                            touchFound = true;
-                            targetTestCandle = testCandle;
-                            targetEma = currentEMA;
-                            break;
-                        }
-                    }
-
-                    if (touchFound && targetTestCandle) {
-                        const isStrongGreen = targetTestCandle.close > targetTestCandle.open && (targetTestCandle.close - targetTestCandle.open) > (targetTestCandle.high - targetTestCandle.low) * 0.4;
-                        const strictNearEma = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003; // Tightened to 0.3%
-
-                        if (isStrongGreen && strictNearEma) {
-                            validSetupFound = true;
-                            matchedFvgTime = fvgTimestamp;
-                            break;
-                        }
-                    }
+            if (botState.intervalId) clearInterval(botState.intervalId);
+            
+            botState.intervalId = setInterval(async () => {
+                if (!botState.isRunning) {
+                    clearInterval(botState.intervalId);
+                    return;
                 }
-            }
-        }
+                try {
+                    const bgResult = await checkAndExecuteStrategy(botState.symbol, botState.capital);
+                    if (bgResult.success) {
+                        botState.entryPrice = bgResult.entryPrice;
+                        botState.lastTradedFvgTime = bgResult.fvgTime;
+                        botState.isRunning = false; // Stop scanning once trade executed
+                        clearInterval(botState.intervalId);
+                    }
+                } catch (e) {
+                    console.error("Background loop trade error:", e.message);
+                }
+            }, 60000); // Checks every 1 minute automatically
 
-        if (!validSetupFound) {
             return res.status(400).json({ 
                 success: false, 
-                error: "Exchange Error: Strategy conditions not met yet. No valid strict FVG + 50 EMA confluence found." 
+                error: "Exchange Error: Initial setup not met yet. Bot is now running in automatic background mode and will execute trade as soon as FVG + EMA setup appears!" 
             });
         }
-
-        // Step 3: Execute Real Order on Gate.io & Capture Real Fill Price
-        const orderResult = await executeGateOrder(symbol, 'buy', 'market', rawQty);
-        const executedPrice = parseFloat(orderResult.price || orderResult.fill_price || formattedCandles[formattedCandles.length - 1].close);
 
         botState.isRunning = true;
         botState.symbol = symbol;
         botState.capital = rawQty;
-        botState.entryPrice = executedPrice;
-        botState.lastTradedFvgTime = matchedFvgTime;
+        botState.entryPrice = result.entryPrice;
+        botState.lastTradedFvgTime = result.fvgTime;
 
         res.json({ 
             success: true, 
-            entryPrice: executedPrice,
-            message: `Automated order successfully executed for ${symbol.replace('_', '')} at $${executedPrice} with $${rawQty}!` 
+            entryPrice: result.entryPrice,
+            message: `Automated order successfully executed for ${symbol.replace('_', '')} at $${result.entryPrice} with $${rawQty}!` 
         });
 
     } catch (err) {
