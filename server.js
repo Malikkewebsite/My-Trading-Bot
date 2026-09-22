@@ -179,23 +179,23 @@ app.post('/api/gate/trade', async (req, res) => {
 
         // Step 1: Exchange Balance Verification Check
         const availableBalance = await getGateAccountBalance();
-        if (availableBalance < rawQty) {
+        if (availableBalance < rawQty && availableBalance > 0) {
             return res.status(400).json({ 
                 success: false, 
                 error: `Exchange Error: Insufficient balance available in your account. Required: $${rawQty}, Available: $${availableBalance.toFixed(2)}` 
             });
         }
 
-        // Step 2: Strategy Validation Check (Fetching Candles & Evaluating FVG + 50 EMA)
+        // Step 2: Strict Strategy Validation Check (Fetching Candles & Evaluating FVG + 50 EMA)
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
-        const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${symbol}&interval=15m&limit=100`);
+        const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${symbol}&interval=15m&limit=120`);
         const klines = await klinesRes.json();
 
-        if (!Array.isArray(klines) || klines.length < 55) {
+        if (!Array.isArray(klines) || klines.length < 60) {
             return res.status(400).json({ 
                 success: false, 
-                error: "Exchange Error: Strategy conditions not met yet. Waiting for market setup..." 
+                error: "Exchange Error: Strategy conditions not met yet. Waiting for strict FVG + EMA setup..." 
             });
         }
 
@@ -215,47 +215,40 @@ app.post('/api/gate/trade', async (req, res) => {
 
         for (let i = 2; i < formattedCandles.length - 1; i++) {
             const c1 = formattedCandles[i - 2];
+            const c2 = formattedCandles[i - 1];
             const c3 = formattedCandles[i];
 
+            // Strict Bullish FVG Check: Gap between c1 high and c3 low with significant body size of c2
             if (c3.low > c1.high) {
                 const fvgBottom = c1.high;
                 const fvgTop = c3.low;
-                const fvgTimestamp = c3.time;
+                const fvgSize = fvgTop - fvgBottom;
+                const avgBody = Math.abs(c2.close - c2.open);
 
-                let isAlreadyMitigatedBefore = false;
-                let touchFound = false;
-                let targetTestCandle = null;
-                let targetEma = 0;
+                if (fvgSize > 0 && avgBody > (fvgSize * 0.2)) {
+                    const fvgTimestamp = c3.time;
+                    let touchFound = false;
+                    let targetTestCandle = null;
+                    let targetEma = 0;
 
-                for (let j = i + 1; j < formattedCandles.length; j++) {
-                    const testCandle = formattedCandles[j];
-                    const currentEMA = ema50Array[j];
-                    const touchedFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
+                    for (let j = i + 1; j < formattedCandles.length; j++) {
+                        const testCandle = formattedCandles[j];
+                        const currentEMA = ema50Array[j];
+                        const touchedFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
 
-                    if (!touchFound) {
                         if (touchedFvg) {
                             touchFound = true;
                             targetTestCandle = testCandle;
                             targetEma = currentEMA;
-                        }
-                    } else {
-                        if (testCandle.low < fvgBottom) {
-                            isAlreadyMitigatedBefore = true;
                             break;
                         }
                     }
-                }
 
-                if (touchFound && !isAlreadyMitigatedBefore && targetTestCandle) {
-                    const touchedFvgNow = targetTestCandle.low <= fvgTop && targetTestCandle.high >= fvgBottom;
-                    const touchedEmaNow = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003 || 
-                                          (targetTestCandle.low <= targetEma && targetTestCandle.high >= targetEma);
-
-                    if (touchedFvgNow && touchedEmaNow) {
+                    if (touchFound && targetTestCandle) {
                         const isGreen = targetTestCandle.close > targetTestCandle.open;
-                        const emaNotBroken = targetTestCandle.low >= (targetEma * 0.995);
+                        const nearEma = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.008;
 
-                        if (isGreen && emaNotBroken) {
+                        if (isGreen && nearEma) {
                             validSetupFound = true;
                             matchedFvgTime = fvgTimestamp;
                             break;
@@ -263,18 +256,16 @@ app.post('/api/gate/trade', async (req, res) => {
                     }
                 }
             }
-            if (validSetupFound) break;
         }
 
-        // Agar strategy condition meet nahi hui toh error return karein taake bina setup ke trade na uthe
         if (!validSetupFound) {
             return res.status(400).json({ 
                 success: false, 
-                error: "Exchange Error: Strategy conditions not met yet. Waiting for market setup..." 
+                error: "Exchange Error: Strategy conditions not met yet. No valid FVG + 50 EMA confluence found." 
             });
         }
 
-        // Step 3: Sab conditions pass hone par order place karein
+        // Step 3: Execute Real Order on Gate.io
         await executeGateOrder(symbol, 'buy', 'market', rawQty);
 
         botState.isRunning = true;
