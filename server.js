@@ -252,10 +252,12 @@ async function checkAndExecuteStrategy(symbol, rawQty) {
         }
     }
 
+    // STRICT CHECK: Agar setup nahi mila toh yahin se return kar do, order execute na ho!
     if (!validSetupFound) {
-        return { success: false, error: "Strict FVG + 50 EMA strategy conditions not met." };
+        return { success: false, error: "Strict FVG + 50 EMA strategy conditions not met yet." };
     }
 
+    // Sirf tabhi order execute hoga jab 100% genuine setup match ho jayega
     const orderResult = await executeGateOrder(symbol, 'buy', 'market', rawQty);
     const executedPrice = parseFloat(orderResult.price || orderResult.fill_price || formattedCandles[formattedCandles.length - 1].close);
 
@@ -277,7 +279,7 @@ app.get('/api/bot/cron', async (req, res) => {
             return res.json({ success: true, message: `Cron executed trade for ${botState.symbol} at $${result.entryPrice}` });
         }
 
-        res.json({ success: false, message: "Cron scanning: Strategy conditions not met yet." });
+        res.json({ success: false, message: "Cron scanning: Strategy conditions not met yet, waiting for genuine setup..." });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -310,7 +312,7 @@ app.post('/api/gate/trade', async (req, res) => {
 
             return res.status(400).json({ 
                 success: false, 
-                error: "Exchange Error: Strategy conditions not met yet. Bot is now active in background scanning mode via Vercel Cron..." 
+                error: "Exchange Error: Initial setup not met yet. Bot is now running in automatic background mode and will execute trade as soon as FVG + EMA setup appears!" 
             });
         }
 
