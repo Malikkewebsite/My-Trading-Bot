@@ -15,13 +15,12 @@ try {
 const DEFAULT_GATE_KEY = process.env.GATE_API_KEY;
 const DEFAULT_GATE_SECRET = process.env.GATE_API_SECRET;
 
-// Bot State Management with Repeat Trade & Fresh FVG Protection
 let botState = {
     isRunning: false,
     symbol: 'BTC_USDT',
     capital: 5,
     intervalId: null,
-    lastTradedFvgTime: null // Purane ya already traded setup ko dubara trade karne se rokne ke liye
+    lastTradedFvgTime: null
 };
 
 app.get('/', (req, res) => {
@@ -33,27 +32,23 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/settings', (req, res) => {
-    jsonResponse(res, { success: true, depositAddress: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345' });
+    res.json({ success: true, depositAddress: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345' });
 });
 
 app.get('/api/deposit/info', (req, res) => {
-    jsonResponse(res, { success: true, address: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345' });
+    res.json({ success: true, address: process.env.DEPOSIT_ADDRESS || 'TYourTRC20DepositWalletAddressHere12345' });
 });
 
 app.post('/api/admin/passcode', (req, res) => {
     const { plan } = req.body || {};
     const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-    jsonResponse(res, { success: true, passcode: randomCode, plan: plan || 'Starter Plan' });
+    res.json({ success: true, passcode: randomCode, plan: plan || 'Starter Plan' });
 });
 
 app.post('/api/admin/generate', (req, res) => {
     const randomCode = 'VIP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-    jsonResponse(res, { success: true, passcode: randomCode });
+    res.json({ success: true, passcode: randomCode });
 });
-
-function jsonResponse(res, data) {
-    res.json(data);
-}
 
 function findAmount(obj) {
     if (!obj || typeof obj !== 'object') return null;
@@ -72,7 +67,6 @@ function findAmount(obj) {
     return null;
 }
 
-// Calculate Exponential Moving Average (EMA)
 function calculateEMA(data, period) {
     if (!data || data.length === 0) return [];
     const k = 2 / (period + 1);
@@ -87,7 +81,6 @@ function calculateEMA(data, period) {
     return emaArray;
 }
 
-// Helper function to execute Gate.io order
 async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '0') {
     const host = 'api.gateio.ws';
     const prefix = '/api/v4';
@@ -145,7 +138,6 @@ async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '
     return data;
 }
 
-// 1. Start Bot & Run Algorithmic FVG (Unmitigated) + 50 EMA Strategy
 app.post('/api/gate/trade', async (req, res) => {
     try {
         const combinedData = { ...(req.query || {}), ...(req.body || {}) };
@@ -170,9 +162,6 @@ app.post('/api/gate/trade', async (req, res) => {
         botState.symbol = symbol;
         botState.capital = rawQty;
 
-        console.log(`[BOT STARTED] Monitoring 15m chart for ${symbol} using strict Unmitigated FVG + 50 EMA Strategy...`);
-
-        // Algorithmic Strategy Loop
         botState.intervalId = setInterval(async () => {
             if (!botState.isRunning) {
                 clearInterval(botState.intervalId);
@@ -185,10 +174,7 @@ app.post('/api/gate/trade', async (req, res) => {
                 const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${botState.symbol}&interval=15m&limit=100`);
                 const klines = await klinesRes.json();
 
-                if (!Array.isArray(klines) || klines.length < 55) {
-                    console.log("[NO TRADE] Insufficient candle data for analysis.");
-                    return;
-                }
+                if (!Array.isArray(klines) || klines.length < 55) return;
 
                 const formattedCandles = klines.map(k => ({
                     time: k[0],
@@ -204,7 +190,6 @@ app.post('/api/gate/trade', async (req, res) => {
                 let validSetupFound = false;
                 let matchedFvgTime = null;
 
-                // Step 2 & Unmitigated Rule: Detect Bullish FVG
                 for (let i = 2; i < formattedCandles.length - 1; i++) {
                     const c1 = formattedCandles[i - 2];
                     const c3 = formattedCandles[i];
@@ -214,12 +199,8 @@ app.post('/api/gate/trade', async (req, res) => {
                         const fvgTop = c3.low;
                         const fvgTimestamp = c3.time;
 
-                        // Agar yeh FVG pehle hi trade ho chuka hai, toh isko skip kardein (Repeat Trade Protection)
-                        if (botState.lastTradedFvgTime === fvgTimestamp) {
-                            continue;
-                        }
+                        if (botState.lastTradedFvgTime === fvgTimestamp) continue;
 
-                        // Check if FVG was already mitigated (touched/crossed) before our target test candle
                         let isAlreadyMitigatedBefore = false;
                         let touchFound = false;
                         let targetTestCandle = null;
@@ -228,18 +209,15 @@ app.post('/api/gate/trade', async (req, res) => {
                         for (let j = i + 1; j < formattedCandles.length; j++) {
                             const testCandle = formattedCandles[j];
                             const currentEMA = ema50Array[j];
-
                             const touchedFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
 
                             if (!touchFound) {
                                 if (touchedFvg) {
-                                    // Yeh pehla touch hai, matlab FVG unmitigated tha aur abhi test hua hai!
                                     touchFound = true;
                                     targetTestCandle = testCandle;
                                     targetEma = currentEMA;
                                 }
                             } else {
-                                // Agar pehle touch ke baad koi aur candle aayi aur usne FVG ko cross kar liya bina proper setup ke, toh mitigated maana jayega
                                 if (testCandle.low < fvgBottom) {
                                     isAlreadyMitigatedBefore = true;
                                     break;
@@ -248,13 +226,11 @@ app.post('/api/gate/trade', async (req, res) => {
                         }
 
                         if (touchFound && !isAlreadyMitigatedBefore && targetTestCandle) {
-                            // Condition A & B: Check FVG touch and 50 EMA touch simultaneously
                             const touchedFvgNow = targetTestCandle.low <= fvgTop && targetTestCandle.high >= fvgBottom;
                             const touchedEmaNow = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003 || 
                                                   (targetTestCandle.low <= targetEma && targetTestCandle.high >= targetEma);
 
                             if (touchedFvgNow && touchedEmaNow) {
-                                // Step 5: Bullish Confirmation Candle Check
                                 const isGreen = targetTestCandle.close > targetTestCandle.open;
                                 const emaNotBroken = targetTestCandle.low >= (targetEma * 0.995);
 
@@ -269,17 +245,9 @@ app.post('/api/gate/trade', async (req, res) => {
                     if (validSetupFound) break;
                 }
 
-                if (!validSetupFound) {
-                    console.log("[NO TRADE / CONDITION NOT MET] No fresh unmitigated FVG + 50 EMA touch & confirmation found.");
-                    return;
-                }
+                if (!validSetupFound) return;
 
-                console.log(`[SETUP MET] Fresh unmitigated FVG & 50 EMA criteria satisfied. Executing LONG entry...`);
-
-                // Save this FVG timestamp so it never triggers twice
                 botState.lastTradedFvgTime = matchedFvgTime;
-
-                // Execute LONG Entry
                 await executeGateOrder(botState.symbol, 'buy', 'market', botState.capital);
                 
                 botState.isRunning = false;
@@ -290,10 +258,7 @@ app.post('/api/gate/trade', async (req, res) => {
             }
         }, 15000);
 
-        jsonResponse(res, { 
-            success: true, 
-            message: 'Bot started successfully. Monitoring fresh unmitigated FVG and 50 EMA strategy conditions...' 
-        });
+        res.json({ success: true, message: 'Bot started successfully. Monitoring fresh unmitigated FVG and 50 EMA strategy conditions...' });
 
     } catch (err) {
         botState.isRunning = false;
@@ -301,20 +266,14 @@ app.post('/api/gate/trade', async (req, res) => {
     }
 });
 
-// 2. Stop Bot & Sell All Open Quantities Endpoint
 app.post('/api/gate/close-all', async (req, res) => {
     try {
         botState.isRunning = false;
-        if (botState.intervalId) {
-            clearInterval(botState.intervalId);
-        }
+        if (botState.intervalId) clearInterval(botState.intervalId);
 
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
-
-        if (!apiKey || !apiSecret) {
-            return res.status(400).json({ success: false, error: 'API keys missing.' });
-        }
+        if (!apiKey || !apiSecret) return res.status(400).json({ success: false, error: 'API keys missing.' });
 
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
@@ -359,20 +318,16 @@ app.post('/api/gate/close-all', async (req, res) => {
             for (const acc of accounts) {
                 const availableBalance = parseFloat(acc.available || 0);
                 const currency = acc.currency;
-                
                 if (currency !== 'USDT' && availableBalance > 0) {
                     const pair = `${currency}_USDT`;
                     try {
                         await executeGateOrder(pair, 'sell', 'market', availableBalance);
-                        console.log(`[EMERGENCY SELL] Sold ${availableBalance} of ${currency} due to Bot Stop.`);
-                    } catch (sellErr) {
-                        console.error(`Failed to sell ${currency}:`, sellErr.message);
-                    }
+                    } catch (sellErr) {}
                 }
             }
         }
 
-        jsonResponse(res, { success: true, message: 'Bot stopped successfully. All open orders canceled and coin quantities sold.' });
+        res.json({ success: true, message: 'Bot stopped successfully and active holdings sold.' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -385,4 +340,5 @@ if (process.env.NODE_ENV !== 'production') {
     });
 }
 
+module.exports,
 module.exports = app;
