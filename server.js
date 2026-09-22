@@ -12,8 +12,9 @@ try {
     console.error("Static folder error:", e);
 }
 
-const DEFAULT_GATE_KEY = process.env.GATE_API_KEY;
-const DEFAULT_GATE_SECRET = process.env.GATE_API_SECRET;
+// Tumhari Gate.io ki Real API Keys yahan directly embed kar di gayi hain
+const DEFAULT_GATE_KEY = "571cbdc229c84e7056d4d6b160fc23b4";
+const DEFAULT_GATE_SECRET = "b292e3d2aceae77273c78945ccf1955488abe3a7151e13f7b91bab53de8d45d3";
 
 let botState = {
     isRunning: false,
@@ -145,7 +146,7 @@ app.post('/api/gate/trade', async (req, res) => {
         const apiSecret = DEFAULT_GATE_SECRET;
 
         if (!apiKey || !apiSecret) {
-            return res.status(400).json({ success: false, error: 'Environment variables API keys are missing.' });
+            return res.status(400).json({ success: false, error: 'API keys are missing.' });
         }
 
         let rawQty = findAmount(combinedData);
@@ -333,12 +334,9 @@ app.post('/api/gate/close-all', async (req, res) => {
     }
 });
 
-if (process.env.NODE_ENV !== 'production') {
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
-    });
-}
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
 
-module.exports,
 module.exports = app;
