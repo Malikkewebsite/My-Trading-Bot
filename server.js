@@ -20,7 +20,6 @@ let botState = {
     symbol: 'BTC_USDT',
     capital: 5,
     entryPrice: 0,
-    intervalId: null,
     lastTradedFvgTime: null
 };
 
@@ -46,7 +45,6 @@ app.get('/api/gate/pairs', async (req, res) => {
         const response = await fetch('https://api.gateio.ws/api/v4/spot/currency_pairs');
         const pairs = await response.json();
         if (Array.isArray(pairs)) {
-            // Format pairs for frontend search (e.g. BTC_USDT, ETH_USDT)
             const symbolList = pairs.map(p => p.id || p.base + '_' + p.quote);
             return res.json({ success: true, pairs: symbolList });
         }
@@ -183,10 +181,10 @@ async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '
 async function checkAndExecuteStrategy(symbol, rawQty) {
     const host = 'api.gateio.ws';
     const prefix = '/api/v4';
-    const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${symbol}&interval=15m&limit=120`);
+    const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${symbol}&interval=15m&limit=150`);
     const klines = await klinesRes.json();
 
-    if (!Array.isArray(klines) || klines.length < 60) {
+    if (!Array.isArray(klines) || klines.length < 80) {
         return { success: false, error: "Not enough candles data." };
     }
 
@@ -204,7 +202,7 @@ async function checkAndExecuteStrategy(symbol, rawQty) {
     let validSetupFound = false;
     let matchedFvgTime = null;
 
-    for (let i = 2; i < formattedCandles.length - 1; i++) {
+    for (let i = 2; i < formattedCandles.length - 2; i++) {
         const c1 = formattedCandles[i - 2];
         const c2 = formattedCandles[i - 1];
         const c3 = formattedCandles[i];
@@ -216,30 +214,35 @@ async function checkAndExecuteStrategy(symbol, rawQty) {
             const c2Body = Math.abs(c2.close - c2.open);
             const c2Range = c2.high - c2.low;
 
-            if (fvgSize > (c3.close * 0.0005) && c2Range > 0 && (c2Body / c2Range) >= 0.5) {
+            if (fvgSize > (c3.close * 0.0015) && c2Range > 0 && (c2Body / c2Range) >= 0.7) {
                 const fvgTimestamp = c3.time;
-                let touchFound = false;
-                let targetTestCandle = null;
+                
+                let pullbackFound = false;
+                let bounceConfirmed = false;
                 let targetEma = 0;
 
-                for (let j = i + 1; j < formattedCandles.length; j++) {
+                for (let j = i + 1; j < formattedCandles.length - 1; j++) {
                     const testCandle = formattedCandles[j];
                     const currentEMA = ema50Array[j];
-                    const touchedFvg = testCandle.low <= fvgTop + (fvgSize * 0.2) && testCandle.low >= fvgBottom - (fvgSize * 0.2);
+                    const insideFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
 
-                    if (touchedFvg) {
-                        touchFound = true;
-                        targetTestCandle = testCandle;
+                    if (insideFvg) {
+                        pullbackFound = true;
                         targetEma = currentEMA;
-                        break;
+                        
+                        const nextCandle = formattedCandles[j + 1];
+                        const isBullishBounce = nextCandle.close > nextCandle.open && (nextCandle.close - nextCandle.open) > (nextCandle.high - nextCandle.low) * 0.5;
+                        const closeToEma = Math.abs(nextCandle.low - targetEma) / targetEma <= 0.002;
+
+                        if (isBullishBounce && closeToEma) {
+                            bounceConfirmed = true;
+                            break;
+                        }
                     }
                 }
 
-                if (touchFound && targetTestCandle) {
-                    const isStrongGreen = targetTestCandle.close > targetTestCandle.open && (targetTestCandle.close - targetTestCandle.open) > (targetTestCandle.high - targetTestCandle.low) * 0.4;
-                    const strictNearEma = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003;
-
-                    if (isStrongGreen && strictNearEma) {
+                if (pullbackFound && bounceConfirmed) {
+                    if (botState.lastTradedFvgTime !== fvgTimestamp) {
                         validSetupFound = true;
                         matchedFvgTime = fvgTimestamp;
                         break;
@@ -250,15 +253,35 @@ async function checkAndExecuteStrategy(symbol, rawQty) {
     }
 
     if (!validSetupFound) {
-        return { success: false, error: "Strategy conditions not met yet." };
+        return { success: false, error: "Strict FVG + 50 EMA strategy conditions not met." };
     }
 
-    // Execute order if setup found
     const orderResult = await executeGateOrder(symbol, 'buy', 'market', rawQty);
     const executedPrice = parseFloat(orderResult.price || orderResult.fill_price || formattedCandles[formattedCandles.length - 1].close);
 
     return { success: true, entryPrice: executedPrice, fvgTime: matchedFvgTime };
 }
+
+// Vercel Background Cron Job Endpoint (Triggers automatically every 1 minute)
+app.get('/api/bot/cron', async (req, res) => {
+    try {
+        if (!botState.isRunning) {
+            return res.json({ success: true, message: "Bot is currently stopped." });
+        }
+
+        const result = await checkAndExecuteStrategy(botState.symbol, botState.capital);
+        if (result.success) {
+            botState.entryPrice = result.entryPrice;
+            botState.lastTradedFvgTime = result.fvgTime;
+            botState.isRunning = false; // Stop scanning once trade is successfully executed
+            return res.json({ success: true, message: `Cron executed trade for ${botState.symbol} at $${result.entryPrice}` });
+        }
+
+        res.json({ success: false, message: "Cron scanning: Strategy conditions not met yet." });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 app.post('/api/gate/trade', async (req, res) => {
     try {
@@ -270,7 +293,6 @@ app.post('/api/gate/trade', async (req, res) => {
 
         const symbol = combinedData.symbol || 'BTC_USDT';
 
-        // Balance Check
         const availableBalance = await getGateAccountBalance();
         if (availableBalance < rawQty && availableBalance > 0) {
             return res.status(400).json({ 
@@ -279,38 +301,16 @@ app.post('/api/gate/trade', async (req, res) => {
             });
         }
 
-        // Try immediate execution check
         const result = await checkAndExecuteStrategy(symbol, rawQty);
         
         if (!result.success) {
-            // If setup not met right now, start background loop to keep checking automatically!
             botState.isRunning = true;
             botState.symbol = symbol;
             botState.capital = rawQty;
 
-            if (botState.intervalId) clearInterval(botState.intervalId);
-            
-            botState.intervalId = setInterval(async () => {
-                if (!botState.isRunning) {
-                    clearInterval(botState.intervalId);
-                    return;
-                }
-                try {
-                    const bgResult = await checkAndExecuteStrategy(botState.symbol, botState.capital);
-                    if (bgResult.success) {
-                        botState.entryPrice = bgResult.entryPrice;
-                        botState.lastTradedFvgTime = bgResult.fvgTime;
-                        botState.isRunning = false; // Stop scanning once trade executed
-                        clearInterval(botState.intervalId);
-                    }
-                } catch (e) {
-                    console.error("Background loop trade error:", e.message);
-                }
-            }, 60000); // Checks every 1 minute automatically
-
             return res.status(400).json({ 
                 success: false, 
-                error: "Exchange Error: Initial setup not met yet. Bot is now running in automatic background mode and will execute trade as soon as FVG + EMA setup appears!" 
+                error: "Exchange Error: Strategy conditions not met yet. Bot is now active in background scanning mode via Vercel Cron..." 
             });
         }
 
@@ -319,6 +319,7 @@ app.post('/api/gate/trade', async (req, res) => {
         botState.capital = rawQty;
         botState.entryPrice = result.entryPrice;
         botState.lastTradedFvgTime = result.fvgTime;
+        botState.isRunning = false;
 
         res.json({ 
             success: true, 
@@ -335,7 +336,6 @@ app.post('/api/gate/close-all', async (req, res) => {
     try {
         botState.isRunning = false;
         botState.entryPrice = 0;
-        if (botState.intervalId) clearInterval(botState.intervalId);
 
         const apiKey = DEFAULT_GATE_KEY;
         const apiSecret = DEFAULT_GATE_SECRET;
