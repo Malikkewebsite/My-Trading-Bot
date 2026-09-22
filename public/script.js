@@ -119,7 +119,7 @@ function showStylishPopup(message, type = 'error') {
 
         if (type === 'error') {
             popup.style.background = 'linear-gradient(135deg, rgba(218, 54, 51, 0.95), rgba(248, 81, 73, 0.95))';
-            popup.innerHTML = `⚠️ <strong>Notice:</strong><br>${message}`;
+            popup.innerHTML = `⚠️ <strong>Exchange Error:</strong><br>${message}`;
         } else {
             popup.style.background = 'linear-gradient(135deg, rgba(35, 134, 54, 0.95), rgba(46, 160, 67, 0.95))';
             popup.innerHTML = `✅ <strong>Success:</strong><br>${message}`;
@@ -179,10 +179,6 @@ async function fetchLiveCoinPrice(symbol) {
                 changeEl.style.color = change >= 0 ? '#3fb950' : '#f85149';
             }
 
-            if (fmaBotActive) {
-                evaluateFMAStrategy(symbol, price);
-            }
-
             if (activeTradeData && activeTradeData.symbol === symbol) {
                 updateActiveTradePnL(price);
             }
@@ -237,73 +233,6 @@ function updateActiveTradePnL(currentPrice) {
     }
 }
 
-async function evaluateFMAStrategy(symbol, currentPrice) {
-    const terminal = document.getElementById('terminal-logs');
-    
-    if (fmaSetupTriggered || activeTradeData) return;
-
-    strategyCheckCounter++;
-    
-    let holdingTbody = document.getElementById('active-holding-tbody');
-    if (holdingTbody) {
-        holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market & Waiting for FMA Setup (Check #${strategyCheckCounter}/5)...</td></tr>`;
-    }
-
-    if (terminal && strategyCheckCounter === 1) {
-        terminal.innerHTML += `<br><span style="color:#f0f6fc;">[FMA ENGINE]</span> Scanning order books, Fair Value Gaps, and 50/200 EMA zones for ${symbol}...`;
-        terminal.scrollTop = terminal.scrollHeight;
-    }
-
-    // Require at least 4 checks (approx 12-15 seconds) so it doesn't instantly trigger blindly
-    if (strategyCheckCounter < 4) {
-        return;
-    }
-
-    // Strategy confirmed valid setup
-    fmaSetupTriggered = true;
-    strategyCheckCounter = 0;
-
-    let capitalInput = document.getElementById('capital-input');
-    let capital = capitalInput ? parseFloat(capitalInput.value) || 500 : 500;
-    
-    let uid = localStorage.getItem('crypto_user_uid');
-    let currentBal = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500;
-
-    if (capital > currentBal) {
-        showStylishPopup('Insufficient balance for this trade capital limit.', 'error');
-        fmaBotActive = false;
-        fmaSetupTriggered = false;
-        return;
-    }
-
-    let activeTradesEl = document.getElementById('active-trades-count');
-    if (activeTradesEl) activeTradesEl.innerText = "1";
-
-    if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SIGNAL CONFIRMED]</span> FMA Setup verified! Executing automated market entry for ${symbol}...`;
-        terminal.scrollTop = terminal.scrollHeight;
-    }
-
-    showStylishPopup(`Automated order successfully executed for ${symbol} with $${capital}!`, 'success');
-
-    let decimals = currentPrice < 1 ? 6 : 2;
-    let slPrice = currentPrice * 0.985; 
-    let riskAmount = currentPrice - slPrice;
-    let tpPrice = currentPrice + (riskAmount * 2.5);
-
-    activeTradeData = {
-        symbol: symbol,
-        entryPrice: currentPrice,
-        currentPrice: currentPrice,
-        capital: capital,
-        sl: slPrice,
-        tp: tpPrice
-    };
-
-    saveUserPersistedData(uid);
-    renderActiveHolding();
-}
-
 function renderActiveHolding() {
     let holdingTbody = document.getElementById('active-holding-tbody');
     let activeTradesEl = document.getElementById('active-trades-count');
@@ -327,7 +256,16 @@ function renderActiveHolding() {
     }
 }
 
-window.closeActiveHolding = function() {
+window.closeActiveHolding = async function() {
+    try {
+        let res = await fetch('/api/gate/close-all', { method: 'POST' });
+        let data = await res.json();
+        if (!data.success) {
+            showStylishPopup(data.error || 'Failed to close position on exchange.', 'error');
+            return;
+        }
+    } catch (e) {}
+
     if (!activeTradeData) {
         alert('No active trade to close.');
         return;
@@ -467,29 +405,75 @@ window.copyAdminCode = function(codeText) {
     showStylishPopup(`Passcode ${codeText} copied to clipboard!`, 'success');
 };
 
-window.startBot = function() {
+window.startBot = async function() {
     fmaBotActive = true;
     strategyCheckCounter = 0;
     
     let uid = localStorage.getItem('crypto_user_uid');
-    
+    let currentBal = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500;
+    let capitalInput = document.getElementById('capital-input');
+    let capital = capitalInput ? parseFloat(capitalInput.value) || 5 : 5;
+
+    if (capital > currentBal) {
+        showStylishPopup('Insufficient balance available in your account.', 'error');
+        fmaBotActive = false;
+        return;
+    }
+
+    // Format current pair for Gate.io API style (e.g. BTC_USDT)
+    let gateSymbol = currentSymbol.replace('USDT', '_USDT');
+
     const terminal = document.getElementById('terminal-logs');
     if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot started. Initializing strict market scan...`;
+        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot started. Initializing strict market scan on Gate.io...`;
         terminal.scrollTop = terminal.scrollHeight;
     }
 
-    if (!activeTradeData) {
-        let holdingTbody = document.getElementById('active-holding-tbody');
-        if (holdingTbody) {
-            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market for FMA Setup...</td></tr>`;
+    try {
+        let res = await fetch('/api/gate/trade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: gateSymbol, capital: capital })
+        });
+        let data = await res.json();
+
+        if (!data.success) {
+            showStylishPopup(data.error || 'Exchange Error: Order execution failed.', 'error');
+            fmaBotActive = false;
+            return;
         }
+
+        showStylishPopup(data.message || `Automated order successfully executed for ${currentSymbol}!`, 'success');
+        
+        let currentPrice = parseFloat(document.getElementById('coin-price')?.innerText.replace('$', '')) || 60000;
+        let slPrice = currentPrice * 0.985;
+        let riskAmount = currentPrice - slPrice;
+        let tpPrice = currentPrice + (riskAmount * 2.5);
+
+        activeTradeData = {
+            symbol: currentSymbol,
+            entryPrice: currentPrice,
+            currentPrice: currentPrice,
+            capital: capital,
+            sl: slPrice,
+            tp: tpPrice
+        };
+
+        saveUserPersistedData(uid);
+        renderActiveHolding();
+
+    } catch (err) {
+        showStylishPopup(err.message || 'Exchange Error: Failed to communicate with server.', 'error');
+        fmaBotActive = false;
     }
-    saveUserPersistedData(uid);
 };
 
-window.stopBot = function() {
+window.stopBot = async function() {
     fmaBotActive = false;
+    try {
+        await fetch('/api/gate/close-all', { method: 'POST' });
+    } catch(e) {}
+
     let holdingTbody = document.getElementById('active-holding-tbody');
     if (holdingTbody && !activeTradeData) {
         holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #8b949e;">Bot stopped. No active holdings.</td></tr>`;
