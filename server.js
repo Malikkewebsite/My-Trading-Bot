@@ -119,14 +119,10 @@ async function executeGateOrder(symbol, side, orderType, amountVal, priceVal = '
     const bodyObj = {
         currency_pair: symbol,
         side: side,
-        type: orderType
+        type: orderType,
+        amount: amountVal.toString(),
+        quote_amount: amountVal.toString()
     };
-
-    if (orderType === 'market' && side === 'buy') {
-        bodyObj.quote_amount = amountVal.toString();
-    } else {
-        bodyObj.amount = amountVal.toString();
-    }
 
     if (orderType !== 'market') {
         bodyObj.price = priceVal.toString();
@@ -218,7 +214,6 @@ app.post('/api/gate/trade', async (req, res) => {
             const c2 = formattedCandles[i - 1];
             const c3 = formattedCandles[i];
 
-            // Strict Bullish FVG Check: Gap between c1 high and c3 low with significant body size of c2
             if (c3.low > c1.high) {
                 const fvgBottom = c1.high;
                 const fvgTop = c3.low;
