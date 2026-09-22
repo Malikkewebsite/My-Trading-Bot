@@ -14,6 +14,7 @@ const spotCoins = [
 let currentSymbol = 'BTCUSDT';
 let fmaBotActive = false;
 let fmaSetupTriggered = false;
+let activeTradeData = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     try {
@@ -29,8 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const adminUidText = document.getElementById('admin-uid-text');
         if (adminUidText) adminUidText.innerText = uid;
 
-        let localBalance = parseFloat(localStorage.getItem('bybit_balance')) || 500.00;
-        let localPlan = localStorage.getItem('bybit_plan') || null;
+        let localBalance = parseFloat(localStorage.getItem(`bybit_balance_${uid}`)) || 500.00;
+        let localPlan = localStorage.getItem(`bybit_plan_${uid}`) || null;
 
         const balanceEl = document.getElementById('header-balance');
         if (balanceEl) balanceEl.innerText = `$${localBalance.toFixed(2)}`;
@@ -44,6 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
             planBadge.className = 'plan-badge active';
             planBadge.style.color = '#3fb950';
         }
+
+        // Load user-specific active holding & logs
+        loadUserPersistedData(uid);
     } catch (e) {
         console.error("Init Error:", e);
     }
@@ -53,6 +57,37 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
     loadAdminSettings();
 });
+
+function loadUserPersistedData(uid) {
+    try {
+        let savedHolding = localStorage.getItem(`active_holding_${uid}`);
+        if (savedHolding) {
+            activeTradeData = JSON.parse(savedHolding);
+            fmaBotActive = true;
+            renderActiveHolding();
+        }
+
+        let savedSignals = localStorage.getItem(`trade_signals_${uid}`);
+        if (savedSignals) {
+            let tbody = document.getElementById('trade-signals-tbody');
+            if (tbody) tbody.innerHTML = savedSignals;
+        }
+    } catch(e) {}
+}
+
+function saveUserPersistedData(uid) {
+    try {
+        if (activeTradeData) {
+            localStorage.setItem(`active_holding_${uid}`, JSON.stringify(activeTradeData));
+        } else {
+            localStorage.removeItem(`active_holding_${uid}`);
+        }
+        let signalsTbody = document.getElementById('trade-signals-tbody');
+        if (signalsTbody) {
+            localStorage.setItem(`trade_signals_${uid}`, signalsTbody.innerHTML);
+        }
+    } catch(e) {}
+}
 
 function showStylishPopup(message, type = 'error') {
     try {
@@ -140,13 +175,57 @@ async function fetchLiveCoinPrice(symbol) {
             if (fmaBotActive) {
                 evaluateFMAStrategy(symbol, price);
             }
+
+            // Update live PnL if active trade exists
+            if (activeTradeData && activeTradeData.symbol === symbol) {
+                updateActiveTradePnL(price);
+            }
         }
     } catch (e) {}
 }
 
+function updateActiveTradePnL(currentPrice) {
+    if (!activeTradeData) return;
+    let entryPrice = activeTradeData.entryPrice;
+    let qty = activeTradeData.qty;
+    let diff = (currentPrice - entryPrice) * qty;
+    let percent = ((currentPrice - entryPrice) / entryPrice) * 100;
+
+    let pnlColor = diff >= 0 ? '#3fb950' : '#f85149';
+    let pnlText = `${diff >= 0 ? '+' : ''}$${diff.toFixed(2)} (${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%)`;
+
+    let holdingTbody = document.getElementById('active-holding-tbody');
+    if (holdingTbody) {
+        holdingTbody.innerHTML = `
+            <tr>
+                <td style="padding: 8px; font-weight:bold;">${activeTradeData.symbol}</td>
+                <td style="padding: 8px;">$${entryPrice.toFixed(entryPrice < 1 ? 5 : 2)}</td>
+                <td style="padding: 8px;">$${currentPrice.toFixed(currentPrice < 1 ? 5 : 2)}</td>
+                <td style="padding: 8px; font-size:11px;">$${activeTradeData.sl.toFixed(2)} / $${activeTradeData.tp.toFixed(2)}</td>
+                <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnlText}</td>
+            </tr>
+        `;
+    }
+
+    let sessionPnlEl = document.getElementById('session-pnl');
+    if (sessionPnlEl) {
+        sessionPnlEl.innerText = `${diff >= 0 ? '+' : ''}$${diff.toFixed(2)}`;
+        sessionPnlEl.style.color = pnlColor;
+    }
+}
+
 async function evaluateFMAStrategy(symbol, currentPrice) {
     const terminal = document.getElementById('terminal-logs');
-    if (fmaSetupTriggered) return;
+    
+    // If bot is active but no trade triggered yet, show Watching Market state
+    if (!fmaSetupTriggered && !activeTradeData) {
+        let holdingTbody = document.getElementById('active-holding-tbody');
+        if (holdingTbody && !holdingTbody.innerHTML.includes('Watching Market')) {
+            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market for Best Opportunity...</td></tr>`;
+        }
+    }
+
+    if (fmaSetupTriggered || activeTradeData) return;
 
     try {
         let capitalInput = document.getElementById('capital-input');
@@ -160,7 +239,7 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
         if (activeTradesEl) activeTradesEl.innerText = "1";
 
         if (terminal) {
-            terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA SIGNAL]</span> Executing backend secure trade...`;
+            terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA SIGNAL]</span> Executing backend secure trade for ${symbol}...`;
             terminal.scrollTop = terminal.scrollHeight;
         }
 
@@ -178,21 +257,102 @@ async function evaluateFMAStrategy(symbol, currentPrice) {
         });
 
         let tradeData = await tradeRes.json();
-        if (!tradeData.success) {
-            let errorText = tradeData.error ? tradeData.error.replace(/Bybit/gi, 'Trading') : 'Trade execution failed.';
+        if (!tradeData.success && tradeData.error) {
+            let errorText = tradeData.error.replace(/Bybit/gi, 'Trading');
             showStylishPopup(errorText, 'error');
             if (terminal) terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${errorText}`;
+            fmaSetupTriggered = false;
         } else {
             showStylishPopup(`LONG order successfully placed via backend for ${symbol}!`, 'success');
-            if (terminal) terminal.innerHTML += `<br><span style="color:#3fb950;">[SUCCESS]</span> Trade executed automatically.`;
+            if (terminal) terminal.innerHTML += `<br><span style="color:#3fb950;">[SUCCESS]</span> Trade executed automatically at $${currentPrice}`;
+            
+            // Set active trade details
+            activeTradeData = {
+                symbol: symbol,
+                entryPrice: currentPrice,
+                currentPrice: currentPrice,
+                qty: qty,
+                sl: currentPrice * 0.98,
+                tp: currentPrice * 1.03
+            };
+
+            let uid = localStorage.getItem('bybit_user_uid');
+            saveUserPersistedData(uid);
+            renderActiveHolding();
         }
         if (terminal) terminal.scrollTop = terminal.scrollHeight;
     } catch (err) {
         let errText = err.message ? err.message.replace(/Bybit/gi, 'Trading') : 'Network error connecting to backend execution route.';
         showStylishPopup(errText, 'error');
         if (terminal) terminal.innerHTML += `<br><span style="color:#f85149;">[ERROR]</span> ${errText}`;
+        fmaSetupTriggered = false;
     }
 }
+
+function renderActiveHolding() {
+    let holdingTbody = document.getElementById('active-holding-tbody');
+    let activeTradesEl = document.getElementById('active-trades-count');
+    if (!holdingTbody) return;
+
+    if (!activeTradeData) {
+        if (fmaBotActive) {
+            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market for Best Opportunity...</td></tr>`;
+        } else {
+            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #8b949e;">No active holdings. Start bot to monitor market.</td></tr>`;
+        }
+        if (activeTradesEl) activeTradesEl.innerText = "0";
+    } else {
+        if (activeTradesEl) activeTradesEl.innerText = "1";
+        updateActiveTradePnL(activeTradeData.currentPrice || activeTradeData.entryPrice);
+    }
+}
+
+window.closeActiveHolding = function() {
+    if (!activeTradeData) {
+        alert('No active trade to close.');
+        return;
+    }
+
+    let currentPrice = parseFloat(document.getElementById('coin-price')?.innerText.replace('$', '')) || activeTradeData.entryPrice;
+    let pnl = (currentPrice - activeTradeData.entryPrice) * activeTradeData.qty;
+    let botCapital = (document.getElementById('capital-input') ? parseFloat(document.getElementById('capital-input').value) : 500) + pnl;
+
+    // Add to Trade Signals Log
+    let signalsTbody = document.getElementById('trade-signals-tbody');
+    if (signalsTbody) {
+        // Clear default placeholder if any
+        if (signalsTbody.innerHTML.includes('No recent signals')) {
+            signalsTbody.innerHTML = '';
+        }
+        let pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
+        let newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td style="padding: 8px; font-weight:bold;">${activeTradeData.symbol}</td>
+            <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
+            <td style="padding: 8px;">$${botCapital.toFixed(2)}</td>
+        `;
+        signalsTbody.prepend(newRow);
+    }
+
+    let terminal = document.getElementById('terminal-logs');
+    if (terminal) {
+        terminal.innerHTML += `<br><span style="color:#d29922;">[SYSTEM]</span> Active trade closed manually. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    activeTradeData = null;
+    fmaSetupTriggered = false;
+    let uid = localStorage.getItem('bybit_user_uid');
+    saveUserPersistedData(uid);
+    renderActiveHolding();
+
+    let sessionPnlEl = document.getElementById('session-pnl');
+    if (sessionPnlEl) sessionPnlEl.innerText = '+$0.00';
+    let activeTradesEl = document.getElementById('active-trades-count');
+    if (activeTradesEl) activeTradesEl.innerText = "0";
+
+    showStylishPopup('Active trade closed successfully.', 'success');
+};
 
 window.showCoinDropdown = function() {
     renderCoinList(spotCoins);
@@ -226,7 +386,6 @@ function renderCoinList(coins) {
             let searchInput = document.getElementById('coin-search');
             if (searchInput) searchInput.value = coin.symbol;
             dropdown.classList.add('hidden');
-            fmaSetupTriggered = false;
             loadTradingViewChart(currentSymbol);
             fetchLiveCoinPrice(currentSymbol);
         };
@@ -281,18 +440,36 @@ window.switchAdminTab = function(subTab) {
 
 window.startBot = function() {
     fmaBotActive = true;
-    fmaSetupTriggered = false;
+    
+    let uid = localStorage.getItem('bybit_user_uid');
     
     const terminal = document.getElementById('terminal-logs');
     if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot started with automated backend execution.`;
+        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot started. Watching Market for Best Opportunity...`;
         terminal.scrollTop = terminal.scrollHeight;
     }
+
+    if (!activeTradeData) {
+        let holdingTbody = document.getElementById('active-holding-tbody');
+        if (holdingTbody) {
+            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market for Best Opportunity...</td></tr>`;
+        }
+    }
+    saveUserPersistedData(uid);
 };
 
 window.stopBot = function() {
     fmaBotActive = false;
-    alert('Bot stopped successfully.');
+    let holdingTbody = document.getElementById('active-holding-tbody');
+    if (holdingTbody && !activeTradeData) {
+        holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #8b949e;">Bot stopped. No active holdings.</td></tr>`;
+    }
+    let terminal = document.getElementById('terminal-logs');
+    if (terminal) {
+        terminal.innerHTML += `<br><span style="color:#f85149; font-weight:bold;">[SYSTEM]</span> FMA Live Bot stopped by user.`;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+    showStylishPopup('Bot stopped successfully.', 'success');
 };
 
 window.clearLogs = function() {
@@ -324,7 +501,7 @@ window.redeemPasscode = async function() {
         let data = await res.json();
         if (data.success) {
             alert(`Success! Plan Unlocked: ${data.tier}`);
-            localStorage.setItem('bybit_plan', data.tier);
+            localStorage.setItem(`bybit_plan_${uid}`, data.tier);
             location.reload();
         } else {
             alert(data.error || 'Invalid passcode');
@@ -367,9 +544,10 @@ window.freezeUser = function() {
 };
 
 window.editUserBalance = function() {
+    let uid = localStorage.getItem('bybit_user_uid');
     let newBal = prompt('Enter new total wallet balance for user:', '500');
     if (newBal) {
-        localStorage.setItem('bybit_balance', newBal);
+        localStorage.setItem(`bybit_balance_${uid}`, newBal);
         let headerBal = document.getElementById('header-balance');
         if (headerBal) headerBal.innerText = `$${parseFloat(newBal).toFixed(2)}`;
         let adminWalletBal = document.getElementById('admin-wallet-bal');
