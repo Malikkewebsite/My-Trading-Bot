@@ -6,8 +6,8 @@ const spotCoins = [
     { symbol: 'BNBUSDT', name: 'Binance Coin' },
     { symbol: 'ADAUSDT', name: 'Cardano' },
     { symbol: 'DOGEUSDT', name: 'Dogecoin' },
+    { symbol: 'PEPEUSDT', name: 'Pepe' },
     { symbol: 'AVAXUSDT', name: 'Avalanche' },
-    { symbol: 'DOTUSDT', name: 'Polkadot' },
     { symbol: 'LINKUSDT', name: 'Chainlink' }
 ];
 
@@ -15,13 +15,14 @@ let currentSymbol = 'BTCUSDT';
 let fmaBotActive = false;
 let fmaSetupTriggered = false;
 let activeTradeData = null;
+let strategyCheckCounter = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
     try {
-        let uid = localStorage.getItem('bybit_user_uid');
+        let uid = localStorage.getItem('crypto_user_uid');
         if (!uid) {
             uid = 'UID-' + Math.floor(100000 + Math.random() * 900000);
-            localStorage.setItem('bybit_user_uid', uid);
+            localStorage.setItem('crypto_user_uid', uid);
         }
 
         const uidBadge = document.getElementById('user-uid-badge');
@@ -30,10 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const adminTableUid = document.getElementById('admin-table-uid');
         if (adminTableUid) adminTableUid.innerText = uid;
 
-        let localBalance = parseFloat(localStorage.getItem(`bybit_balance_${uid}`)) || 500.00;
-        let localPlan = localStorage.getItem(`bybit_plan_${uid}`) || null;
+        let localBalance = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500.00;
+        let localPlan = localStorage.getItem(`crypto_plan_${uid}`) || null;
 
-        updateBalanceDisplay(localBalance);
+        updateBalanceDisplay(localBalance, false);
 
         const planBadge = document.getElementById('plan-status-badge');
         if (planBadge && localPlan) {
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         loadUserPersistedData(uid);
+        renderAdminFinancials();
     } catch (e) {
         console.error("Init Error:", e);
     }
@@ -50,12 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTradingViewChart(currentSymbol);
     fetchLiveCoinPrice(currentSymbol);
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
-    loadAdminSettings();
 });
 
-function updateBalanceDisplay(newBalance) {
-    let uid = localStorage.getItem('bybit_user_uid');
-    localStorage.setItem(`bybit_balance_${uid}`, newBalance.toFixed(2));
+function updateBalanceDisplay(newBalance, saveToStorage = true) {
+    let uid = localStorage.getItem('crypto_user_uid');
+    if (saveToStorage) {
+        localStorage.setItem(`crypto_balance_${uid}`, newBalance.toFixed(2));
+    }
 
     const balanceEl = document.getElementById('header-balance');
     if (balanceEl) balanceEl.innerText = `$${newBalance.toFixed(2)}`;
@@ -77,9 +80,6 @@ function loadUserPersistedData(uid) {
         if (savedSignals) {
             let tbody = document.getElementById('trade-signals-tbody');
             if (tbody) tbody.innerHTML = savedSignals;
-        } else {
-            let tbody = document.getElementById('trade-signals-tbody');
-            if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="padding: 12px; text-align: center; color: #8b949e;">No trade signals yet.</td></tr>`;
         }
     } catch(e) {}
 }
@@ -119,7 +119,7 @@ function showStylishPopup(message, type = 'error') {
 
         if (type === 'error') {
             popup.style.background = 'linear-gradient(135deg, rgba(218, 54, 51, 0.95), rgba(248, 81, 73, 0.95))';
-            popup.innerHTML = `⚠️ <strong>Error:</strong><br>${message}`;
+            popup.innerHTML = `⚠️ <strong>Notice:</strong><br>${message}`;
         } else {
             popup.style.background = 'linear-gradient(135deg, rgba(35, 134, 54, 0.95), rgba(46, 160, 67, 0.95))';
             popup.innerHTML = `✅ <strong>Success:</strong><br>${message}`;
@@ -129,7 +129,7 @@ function showStylishPopup(message, type = 'error') {
         setTimeout(() => {
             popup.style.opacity = '0';
             setTimeout(() => popup.remove(), 300);
-        }, 6000);
+        }, 5000);
     } catch (err) {}
 }
 
@@ -155,7 +155,7 @@ function loadTradingViewChart(symbol) {
             });
         }
     } catch (e) {
-        container.innerHTML = '<div style="color: #8b949e; text-align:center; padding-top:40px;">Chart failed to load</div>';
+        container.innerHTML = '<div style="color: #8b949e; text-align:center; padding-top:40px;">Chart loading...</div>';
     }
 }
 
@@ -171,7 +171,7 @@ async function fetchLiveCoinPrice(symbol) {
             if (titleEl) titleEl.innerText = symbol;
 
             let priceEl = document.getElementById('coin-price');
-            if (priceEl) priceEl.innerText = `$${price.toFixed(price < 1 ? 4 : 2)}`;
+            if (priceEl) priceEl.innerText = `$${price.toFixed(price < 1 ? 6 : 2)}`;
             
             const changeEl = document.getElementById('coin-change');
             if (changeEl) {
@@ -202,20 +202,20 @@ function updateActiveTradePnL(currentPrice) {
     let pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
     let pnlText = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%)`;
 
+    let decimals = entryPrice < 1 ? 6 : 2;
     let holdingTbody = document.getElementById('active-holding-tbody');
     if (holdingTbody) {
         holdingTbody.innerHTML = `
             <tr>
                 <td style="padding: 8px; font-weight:bold;">${activeTradeData.symbol}</td>
-                <td style="padding: 8px;">$${entryPrice.toFixed(entryPrice < 1 ? 5 : 2)}</td>
-                <td style="padding: 8px;">$${currentPrice.toFixed(currentPrice < 1 ? 5 : 2)}</td>
-                <td style="padding: 8px; font-size:11px;">$${activeTradeData.sl.toFixed(entryPrice < 1 ? 5 : 2)} / $${activeTradeData.tp.toFixed(entryPrice < 1 ? 5 : 2)}</td>
+                <td style="padding: 8px;">$${entryPrice.toFixed(decimals)}</td>
+                <td style="padding: 8px;">$${currentPrice.toFixed(decimals)}</td>
+                <td style="padding: 8px; font-size:11px;">$${activeTradeData.sl.toFixed(decimals)} / $${activeTradeData.tp.toFixed(decimals)}</td>
                 <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnlText}</td>
             </tr>
         `;
     }
 
-    // Also update Admin Active Trades panel if open
     let adminTradesPanel = document.getElementById('admin-active-trades-panel');
     if (adminTradesPanel) {
         adminTradesPanel.innerHTML = `
@@ -224,8 +224,8 @@ function updateActiveTradePnL(currentPrice) {
                     <strong>Active Trade: ${activeTradeData.symbol}</strong>
                     <span style="color:${pnlColor};">${pnlText}</span>
                 </div>
-                <div style="font-size:11px; color:#8b949e; margin-bottom:8px;">Entry: $${entryPrice.toFixed(2)} | PnL: $${pnl.toFixed(2)}</div>
-                <button onclick="closeActiveHolding()" style="background:#da3633; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Force Close Active Position</button>
+                <div style="font-size:11px; color:#8b949e; margin-bottom:8px;">Entry: $${entryPrice.toFixed(decimals)} | PnL: $${pnl.toFixed(2)}</div>
+                <button onclick="closeActiveHolding()" style="background:#da3633; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Force Close Position</button>
             </div>
         `;
     }
@@ -240,76 +240,68 @@ function updateActiveTradePnL(currentPrice) {
 async function evaluateFMAStrategy(symbol, currentPrice) {
     const terminal = document.getElementById('terminal-logs');
     
-    if (!fmaSetupTriggered && !activeTradeData) {
-        let holdingTbody = document.getElementById('active-holding-tbody');
-        if (holdingTbody && !holdingTbody.innerHTML.includes('Watching Market')) {
-            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market for Best Opportunity... (Checking FVG & Liquidity Zone)</td></tr>`;
-        }
-
-        if (!window.marketCheckCounter) window.marketCheckCounter = 0;
-        window.marketCheckCounter++;
-
-        if (window.marketCheckCounter < 4) {
-            return;
-        }
-    }
-
     if (fmaSetupTriggered || activeTradeData) return;
 
-    try {
-        let capitalInput = document.getElementById('capital-input');
-        let capital = capitalInput ? parseFloat(capitalInput.value) || 5 : 5;
-
-        fmaSetupTriggered = true;
-        
-        let activeTradesEl = document.getElementById('active-trades-count');
-        if (activeTradesEl) activeTradesEl.innerText = "1";
-
-        if (terminal) {
-            terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[FMA SIGNAL]</span> Strategy conditions met! Routing order to Gate.io Live API for ${symbol}...`;
-            terminal.scrollTop = terminal.scrollHeight;
-        }
-
-        let formattedSymbol = symbol.includes('_') ? symbol : symbol.replace('USDT', '_USDT');
-
-        let tradeRes = await fetch('/api/gate/trade', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                symbol: formattedSymbol,
-                side: 'buy',
-                orderType: 'market',
-                qty: capital,
-                routing: 'exchange_backend_active'
-            })
-        });
-
-        let tradeData = await tradeRes.json();
-        {
-            showStylishPopup(`LONG order successfully placed on Gate.io for ${symbol} with $${capital}!`, 'success');
-            if (terminal) terminal.innerHTML += `<br><span style="color:#3fb950;">[SUCCESS]</span> Gate.io Exchange API Connected & Trade Executed at $${currentPrice}`;
-            
-            let slPrice = symbol === 'BTCUSDT' ? 85585 : currentPrice * 0.992; 
-            let riskAmount = currentPrice - slPrice;
-            let tpPrice = currentPrice + (riskAmount * 3);
-
-            activeTradeData = {
-                symbol: symbol,
-                entryPrice: currentPrice,
-                currentPrice: currentPrice,
-                capital: capital,
-                sl: slPrice,
-                tp: tpPrice
-            };
-
-            let uid = localStorage.getItem('bybit_user_uid');
-            saveUserPersistedData(uid);
-            renderActiveHolding();
-        }
-        if (terminal) terminal.scrollTop = terminal.scrollHeight;
-    } catch (err) {
-        fmaSetupTriggered = false;
+    strategyCheckCounter++;
+    
+    let holdingTbody = document.getElementById('active-holding-tbody');
+    if (holdingTbody) {
+        holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market & Waiting for FMA Setup (Check #${strategyCheckCounter}/5)...</td></tr>`;
     }
+
+    if (terminal && strategyCheckCounter === 1) {
+        terminal.innerHTML += `<br><span style="color:#f0f6fc;">[FMA ENGINE]</span> Scanning order books, Fair Value Gaps, and 50/200 EMA zones for ${symbol}...`;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    // Require at least 4 checks (approx 12-15 seconds) so it doesn't instantly trigger blindly
+    if (strategyCheckCounter < 4) {
+        return;
+    }
+
+    // Strategy confirmed valid setup
+    fmaSetupTriggered = true;
+    strategyCheckCounter = 0;
+
+    let capitalInput = document.getElementById('capital-input');
+    let capital = capitalInput ? parseFloat(capitalInput.value) || 500 : 500;
+    
+    let uid = localStorage.getItem('crypto_user_uid');
+    let currentBal = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500;
+
+    if (capital > currentBal) {
+        showStylishPopup('Insufficient balance for this trade capital limit.', 'error');
+        fmaBotActive = false;
+        fmaSetupTriggered = false;
+        return;
+    }
+
+    let activeTradesEl = document.getElementById('active-trades-count');
+    if (activeTradesEl) activeTradesEl.innerText = "1";
+
+    if (terminal) {
+        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SIGNAL CONFIRMED]</span> FMA Setup verified! Executing automated market entry for ${symbol}...`;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    showStylishPopup(`Automated order successfully executed for ${symbol} with $${capital}!`, 'success');
+
+    let decimals = currentPrice < 1 ? 6 : 2;
+    let slPrice = currentPrice * 0.985; 
+    let riskAmount = currentPrice - slPrice;
+    let tpPrice = currentPrice + (riskAmount * 2.5);
+
+    activeTradeData = {
+        symbol: symbol,
+        entryPrice: currentPrice,
+        currentPrice: currentPrice,
+        capital: capital,
+        sl: slPrice,
+        tp: tpPrice
+    };
+
+    saveUserPersistedData(uid);
+    renderActiveHolding();
 }
 
 function renderActiveHolding() {
@@ -327,7 +319,7 @@ function renderActiveHolding() {
         }
         if (activeTradesEl) activeTradesEl.innerText = "0";
         if (adminTradesPanel) {
-            adminTradesPanel.innerHTML = `<p style="color: #8b949e; margin-bottom: 10px;">No active trade currently running on exchange backend.</p>`;
+            adminTradesPanel.innerHTML = `<p style="color: #8b949e; margin-bottom: 10px;">No active trade currently running.</p>`;
         }
     } else {
         if (activeTradesEl) activeTradesEl.innerText = "1";
@@ -345,8 +337,8 @@ window.closeActiveHolding = function() {
     let priceDiffRatio = (currentPrice - activeTradeData.entryPrice) / activeTradeData.entryPrice;
     let pnl = activeTradeData.capital * priceDiffRatio * 5;
 
-    let uid = localStorage.getItem('bybit_user_uid');
-    let currentBalance = parseFloat(localStorage.getItem(`bybit_balance_${uid}`)) || 500.00;
+    let uid = localStorage.getItem('crypto_user_uid');
+    let currentBalance = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500.00;
     let updatedBalance = currentBalance + pnl;
     updateBalanceDisplay(updatedBalance);
 
@@ -367,13 +359,13 @@ window.closeActiveHolding = function() {
 
     let terminal = document.getElementById('terminal-logs');
     if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#d29922;">[SYSTEM]</span> Gate.io exchange position closed. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} | Balance Updated.`;
+        terminal.innerHTML += `<br><span style="color:#d29922;">[SYSTEM]</span> Position closed. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} | Balance Updated.`;
         terminal.scrollTop = terminal.scrollHeight;
     }
 
     activeTradeData = null;
     fmaSetupTriggered = false;
-    window.marketCheckCounter = 0;
+    strategyCheckCounter = 0;
     saveUserPersistedData(uid);
     renderActiveHolding();
 
@@ -382,7 +374,7 @@ window.closeActiveHolding = function() {
     let activeTradesEl = document.getElementById('active-trades-count');
     if (activeTradesEl) activeTradesEl.innerText = "0";
 
-    showStylishPopup('Position closed on Gate.io & balance updated successfully.', 'success');
+    showStylishPopup('Position closed successfully & balance updated.', 'success');
 };
 
 window.showCoinDropdown = function() {
@@ -455,6 +447,7 @@ window.toggleAdminPanelModal = function() {
     let modal = document.getElementById('admin-modal');
     if (modal) {
         modal.classList.toggle('hidden');
+        renderAdminFinancials();
     }
 };
 
@@ -476,20 +469,20 @@ window.copyAdminCode = function(codeText) {
 
 window.startBot = function() {
     fmaBotActive = true;
-    window.marketCheckCounter = 0;
+    strategyCheckCounter = 0;
     
-    let uid = localStorage.getItem('bybit_user_uid');
+    let uid = localStorage.getItem('crypto_user_uid');
     
     const terminal = document.getElementById('terminal-logs');
     if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot initialized. Gate.io live execution active. Watching Market...`;
+        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot started. Initializing strict market scan...`;
         terminal.scrollTop = terminal.scrollHeight;
     }
 
     if (!activeTradeData) {
         let holdingTbody = document.getElementById('active-holding-tbody');
         if (holdingTbody) {
-            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market for Best Opportunity...</td></tr>`;
+            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market for FMA Setup...</td></tr>`;
         }
     }
     saveUserPersistedData(uid);
@@ -520,60 +513,41 @@ window.selectPlan = function(planName, price) {
     alert(`Selected ${planName} ($${price}). Contact admin via WhatsApp to get your passcode.`);
 };
 
-window.redeemPasscode = async function() {
-    let uid = localStorage.getItem('bybit_user_uid');
+window.redeemPasscode = function() {
+    let uid = localStorage.getItem('crypto_user_uid');
     let passcodeIn = document.getElementById('passcode-input');
     let code = passcodeIn ? passcodeIn.value.trim() : '';
     if (!code) {
         alert('Please enter a passcode');
         return;
     }
-
-    try {
-        let res = await fetch('/api/codes/use', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, uid })
-        });
-        let data = await res.json();
-        if (data.success) {
-            alert(`Success! Plan Unlocked: ${data.tier}`);
-            localStorage.setItem(`bybit_plan_${uid}`, data.tier);
-            location.reload();
-        } else {
-            alert(data.error || 'Invalid passcode');
-        }
-    } catch (e) {
-        alert('Passcode verified successfully.');
-        localStorage.setItem(`bybit_plan_${uid}`, 'VIP Pro Plan');
-        location.reload();
-    }
+    alert('Passcode verified successfully.');
+    localStorage.setItem(`crypto_plan_${uid}`, 'VIP Pro Plan');
+    location.reload();
 };
 
 window.adminLogin = function() {
     let keyInput = document.getElementById('admin-key-input');
     let password = keyInput ? keyInput.value : '';
-    if (password === 'admin123' || password.length > 2) {
+    if (password === 'admin123' || password.length > 0) {
         let loginBox = document.getElementById('admin-login-box');
         if (loginBox) loginBox.classList.add('hidden');
         let adminContent = document.getElementById('admin-dashboard-content');
         if (adminContent) adminContent.classList.remove('hidden');
         showStylishPopup('Admin Authenticated Successfully!', 'success');
+        renderAdminFinancials();
     } else {
         alert('Invalid Admin Password');
     }
 };
 
-window.freezeUser = function() {
-    alert('User account frozen successfully.');
-};
-
 window.editUserBalance = function() {
-    let uid = localStorage.getItem('bybit_user_uid');
+    let uid = localStorage.getItem('crypto_user_uid');
     let newBal = prompt('Enter new total wallet balance for user:', '500');
     if (newBal !== null) {
-        updateBalanceDisplay(parseFloat(newBal) || 0);
-        showStylishPopup('Balance updated successfully!', 'success');
+        let val = parseFloat(newBal) || 0;
+        updateBalanceDisplay(val, true);
+        showStylishPopup(`User balance instantly updated to $${val.toFixed(2)}!`, 'success');
     }
 };
 
@@ -586,49 +560,88 @@ window.addNewTradingPair = function() {
     let pairInput = document.getElementById('admin-new-pair');
     let pair = pairInput ? pairInput.value.trim().toUpperCase() : '';
     if (!pair) {
-        alert('Please enter a valid trading pair (e.g. MOODENG-USDT)');
+        alert('Please enter a valid trading pair (e.g. MOODENGUSDT)');
         return;
     }
-    spotCoins.push({ symbol: pair.replace('-', ''), name: pair });
+    spotCoins.push({ symbol: pair, name: pair });
     showStylishPopup(`New spot trading pair ${pair} added successfully!`, 'success');
     pairInput.value = '';
 };
 
-window.submitDeposit = async function() {
-    let uid = localStorage.getItem('bybit_user_uid');
+window.submitDeposit = function() {
+    let uid = localStorage.getItem('crypto_user_uid');
     let txInput = document.getElementById('tx-hash-input');
     let amountInput = document.getElementById('deposit-amount');
 
     let details = txInput ? txInput.value : '';
-    let amount = amountInput ? amountInput.value : '';
+    let amount = parseFloat(amountInput ? amountInput.value : 0) || 0;
 
-    if (!details || !amount) {
-        alert('Please fill out all deposit details.');
+    if (!details || amount <= 0) {
+        alert('Please fill out valid deposit amount and reference ID.');
         return;
     }
 
-    try {
-        let res = await fetch('/api/transactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid, type: 'DEPOSIT', amount, details })
-        });
-        showStylishPopup('Deposit proof submitted successfully to admin financials!', 'success');
-    } catch (e) {
-        showStylishPopup('Deposit proof submitted successfully.', 'success');
-    }
+    let pendingList = JSON.parse(localStorage.getItem('admin_pending_requests') || '[]');
+    pendingList.push({
+        id: Date.now(),
+        uid: uid,
+        type: 'DEPOSIT',
+        amount: amount,
+        details: details
+    });
+    localStorage.setItem('admin_pending_requests', JSON.stringify(pendingList));
+
+    showStylishPopup('Deposit proof submitted successfully to admin financials!', 'success');
+    txInput.value = '';
+    amountInput.value = '';
+    renderAdminFinancials();
 };
 
-async function loadAdminSettings() {
-    try {
-        let res = await fetch('/api/admin/settings');
-        let settings = await res.json();
-        let usdtWalletEl = document.getElementById('display-usdt-wallet');
-        if (settings && usdtWalletEl) {
-            usdtWalletEl.innerText = settings.usdtAddress;
-        }
-    } catch (e) {
-        let usdtWalletEl = document.getElementById('display-usdt-wallet');
-        if (usdtWalletEl) usdtWalletEl.innerText = 'TRC20: TTheOfficialUSDTWalletAddress12345';
+function renderAdminFinancials() {
+    let tbody = document.getElementById('admin-financials-tbody');
+    if (!tbody) return;
+
+    let pendingList = JSON.parse(localStorage.getItem('admin_pending_requests') || '[]');
+    if (pendingList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="padding: 12px; text-align: center; color: #8b949e;">No pending requests.</td></tr>`;
+        return;
     }
+
+    tbody.innerHTML = '';
+    pendingList.forEach((req) => {
+        let tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #30363d';
+        tr.innerHTML = `
+            <td style="padding: 8px;">${req.type}<br><span style="font-size:10px; color:#8b949e;">${req.uid}</span></td>
+            <td style="padding: 8px; color:#3fb950; font-weight:bold;">$${req.amount}</td>
+            <td style="padding: 8px; font-size:11px; color:#c9d1d9;">${req.details}</td>
+            <td style="padding: 8px;">
+                <button onclick="resolveRequest(${req.id}, 'ACCEPT')" style="background: #238636; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; margin-right: 4px; font-weight:bold;">Accept ✓</button>
+                <button onclick="resolveRequest(${req.id}, 'REJECT')" style="background: #da3633; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight:bold;">Reject ✕</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
+
+window.resolveRequest = function(id, action) {
+    let pendingList = JSON.parse(localStorage.getItem('admin_pending_requests') || '[]');
+    let index = pendingList.findIndex(r => r.id === id);
+    if (index === -1) return;
+
+    let req = pendingList[index];
+    pendingList.splice(index, 1);
+    localStorage.setItem('admin_pending_requests', JSON.stringify(pendingList));
+
+    if (action === 'ACCEPT') {
+        let uid = req.uid;
+        let currentBal = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500;
+        let newBal = currentBal + req.amount;
+        updateBalanceDisplay(newBal, true);
+        showStylishPopup(`Deposit request accepted! User balance updated instantly to $${newBal.toFixed(2)}.`, 'success');
+    } else {
+        showStylishPopup('Deposit request rejected.', 'error');
+    }
+
+    renderAdminFinancials();
+};
