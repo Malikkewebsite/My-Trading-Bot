@@ -19,6 +19,7 @@ let botState = {
     isRunning: false,
     symbol: 'BTC_USDT',
     capital: 5,
+    entryPrice: 0,
     intervalId: null,
     lastTradedFvgTime: null
 };
@@ -182,7 +183,7 @@ app.post('/api/gate/trade', async (req, res) => {
             });
         }
 
-        // Step 2: Strict Strategy Validation Check (Fetching Candles & Evaluating FVG + 50 EMA)
+        // Step 2: Ultra-Strict Strategy Validation Check (FVG + 50 EMA Confluence)
         const host = 'api.gateio.ws';
         const prefix = '/api/v4';
         const klinesRes = await fetch(`https://${host}${prefix}/spot/candlesticks?currency_pair=${symbol}&interval=15m&limit=120`);
@@ -214,13 +215,15 @@ app.post('/api/gate/trade', async (req, res) => {
             const c2 = formattedCandles[i - 1];
             const c3 = formattedCandles[i];
 
+            // Strict Bullish FVG: Gap must be prominent and c2 must be a strong momentum candle
             if (c3.low > c1.high) {
                 const fvgBottom = c1.high;
                 const fvgTop = c3.low;
                 const fvgSize = fvgTop - fvgBottom;
-                const avgBody = Math.abs(c2.close - c2.open);
+                const c2Body = Math.abs(c2.close - c2.open);
+                const c2Range = c2.high - c2.low;
 
-                if (fvgSize > 0 && avgBody > (fvgSize * 0.2)) {
+                if (fvgSize > (c3.close * 0.0005) && c2Range > 0 && (c2Body / c2Range) >= 0.5) {
                     const fvgTimestamp = c3.time;
                     let touchFound = false;
                     let targetTestCandle = null;
@@ -229,7 +232,7 @@ app.post('/api/gate/trade', async (req, res) => {
                     for (let j = i + 1; j < formattedCandles.length; j++) {
                         const testCandle = formattedCandles[j];
                         const currentEMA = ema50Array[j];
-                        const touchedFvg = testCandle.low <= fvgTop && testCandle.high >= fvgBottom;
+                        const touchedFvg = testCandle.low <= fvgTop + (fvgSize * 0.2) && testCandle.low >= fvgBottom - (fvgSize * 0.2);
 
                         if (touchedFvg) {
                             touchFound = true;
@@ -240,10 +243,10 @@ app.post('/api/gate/trade', async (req, res) => {
                     }
 
                     if (touchFound && targetTestCandle) {
-                        const isGreen = targetTestCandle.close > targetTestCandle.open;
-                        const nearEma = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.008;
+                        const isStrongGreen = targetTestCandle.close > targetTestCandle.open && (targetTestCandle.close - targetTestCandle.open) > (targetTestCandle.high - targetTestCandle.low) * 0.4;
+                        const strictNearEma = Math.abs(targetTestCandle.low - targetEma) / targetEma <= 0.003; // Tightened to 0.3%
 
-                        if (isGreen && nearEma) {
+                        if (isStrongGreen && strictNearEma) {
                             validSetupFound = true;
                             matchedFvgTime = fvgTimestamp;
                             break;
@@ -256,19 +259,25 @@ app.post('/api/gate/trade', async (req, res) => {
         if (!validSetupFound) {
             return res.status(400).json({ 
                 success: false, 
-                error: "Exchange Error: Strategy conditions not met yet. No valid FVG + 50 EMA confluence found." 
+                error: "Exchange Error: Strategy conditions not met yet. No valid strict FVG + 50 EMA confluence found." 
             });
         }
 
-        // Step 3: Execute Real Order on Gate.io
-        await executeGateOrder(symbol, 'buy', 'market', rawQty);
+        // Step 3: Execute Real Order on Gate.io & Capture Real Fill Price
+        const orderResult = await executeGateOrder(symbol, 'buy', 'market', rawQty);
+        const executedPrice = parseFloat(orderResult.price || orderResult.fill_price || formattedCandles[formattedCandles.length - 1].close);
 
         botState.isRunning = true;
         botState.symbol = symbol;
         botState.capital = rawQty;
+        botState.entryPrice = executedPrice;
         botState.lastTradedFvgTime = matchedFvgTime;
 
-        res.json({ success: true, message: `Automated order successfully executed for ${symbol.replace('_', '')} with $${rawQty}!` });
+        res.json({ 
+            success: true, 
+            entryPrice: executedPrice,
+            message: `Automated order successfully executed for ${symbol.replace('_', '')} at $${executedPrice} with $${rawQty}!` 
+        });
 
     } catch (err) {
         res.status(500).json({ success: false, error: err.message || 'Exchange Error: Failed to execute trade.' });
@@ -278,6 +287,7 @@ app.post('/api/gate/trade', async (req, res) => {
 app.post('/api/gate/close-all', async (req, res) => {
     try {
         botState.isRunning = false;
+        botState.entryPrice = 0;
         if (botState.intervalId) clearInterval(botState.intervalId);
 
         const apiKey = DEFAULT_GATE_KEY;
