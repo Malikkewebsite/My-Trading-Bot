@@ -19,7 +19,6 @@ const spotCoins = [
     { symbol: 'RENDERUSDT', name: 'Render' },
     { symbol: 'INJUSDT', name: 'Injective' },
     { symbol: 'FETUSDT', name: 'Artificial Superintelligence' },
-    { symbol: 'NEARUSDT', name: 'Near' },
     { symbol: 'ATOMUSDT', name: 'Cosmos' },
     { symbol: 'DOTUSDT', name: 'Polkadot' },
     { symbol: 'MATICUSDT', name: 'Polygon' },
@@ -28,8 +27,7 @@ const spotCoins = [
     { symbol: 'LTCUSDT', name: 'Litecoin' },
     { symbol: 'ETCUSDT', name: 'Ethereum Classic' },
     { symbol: 'XLMUSDT', name: 'Stellar' },
-    { symbol: 'ALGOUSDT', name: 'Algorand' },
-    { symbol: 'NEARUSDT', name: 'Near' }
+    { symbol: 'ALGOUSDT', name: 'Algorand' }
 ];
 
 let currentSymbol = 'BTCUSDT';
@@ -66,6 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadUserPersistedData(uid);
         renderAdminFinancials();
+        
+        // Auto register service worker for push notifications on load
+        registerServiceWorkerAndPush();
     } catch (e) {
         console.error("Init Error:", e);
     }
@@ -74,6 +75,42 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchLiveCoinPrice(currentSymbol);
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
 });
+
+// Web Push Registration Helper
+async function registerServiceWorkerAndPush() {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            const permissionResult = await Notification.requestPermission();
+            if (permissionResult !== 'granted') return;
+
+            const subscribeOptions = {
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array('YOUR_PUBLIC_VAPID_KEY_HERE')
+            };
+
+            const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
+            await fetch('/api/save-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pushSubscription)
+            });
+        } catch (error) {
+            console.error('Push registration failed:', error);
+        }
+    }
+}
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
 
 function updateBalanceDisplay(newBalance, saveToStorage = true) {
     let uid = localStorage.getItem('crypto_user_uid');
@@ -425,15 +462,7 @@ window.copyAdminCode = function(codeText) {
     showStylishPopup(`Passcode ${codeText} copied to clipboard!`, 'success');
 };
 
-// Strict Strategy Validation Function
 function checkStrictStrategyConditions() {
-    // Yahan strict SMC / Price Action / EMA validation rules check kiye jate hain
-    // Maslan market volatility aur trend confirmation
-    let changeElementText = document.getElementById('coin-change')?.innerText || "0%";
-    let numericChange = parseFloat(changeElementText.replace('%', '').replace('+', '')) || 0;
-    
-    // Strict Filter: Agar market mein extreme anomaly na ho aur trend valid ho tabhi true return karega
-    // Aap is logic ko apne exact SMC/FVG conditions ke mutabiq mazeed tweak kar sakte hain
     return true; 
 }
 
@@ -458,7 +487,6 @@ window.startBot = async function() {
         terminal.scrollTop = terminal.scrollHeight;
     }
 
-    // Strict Strategy Verification Check
     let isStrategyMet = checkStrictStrategyConditions();
     if (!isStrategyMet) {
         showStylishPopup('Strategy Filter: Strict setup criteria not met yet. Waiting for clear FVG/Liquidity sweep...', 'error');
