@@ -73,7 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
 });
 
-// Push Notification Permission & Registration Trigger Function
 window.requestPushPermission = async function() {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
         try {
@@ -265,6 +264,11 @@ function updateActiveTradePnL(currentPrice) {
                 <td style="padding: 8px; font-size:11px;">$${activeTradeData.sl.toFixed(decimals)} / $${activeTradeData.tp.toFixed(decimals)}</td>
                 <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnlText}</td>
             </tr>
+            <tr>
+                <td colspan="5" style="padding: 6px; text-align: center;">
+                    <button onclick="openEditSlTpModal()" style="background:#1f6feb; color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚙️ Edit SL/TP (Real Exchange)</button>
+                </td>
+            </tr>
         `;
     }
 
@@ -288,6 +292,53 @@ function updateActiveTradePnL(currentPrice) {
         sessionPnlEl.style.color = pnlColor;
     }
 }
+
+// Feature 2: Real-Time SL/TP Edit & Exchange Sync Function
+window.openEditSlTpModal = function() {
+    if (!activeTradeData) {
+        alert('No active trade found.');
+        return;
+    }
+    let newSl = prompt('Enter New Stop-Loss (SL) Price:', activeTradeData.sl);
+    if (newSl === null) return;
+    let newTp = prompt('Enter New Take-Profit (TP) Price:', activeTradeData.tp);
+    if (newTp === null) return;
+
+    let slVal = parseFloat(newSl);
+    let tpVal = parseFloat(newTp);
+
+    if (isNaN(slVal) || isNaN(tpVal)) {
+        showStylishPopup('Please enter valid numeric prices for SL and TP.', 'error');
+        return;
+    }
+
+    // Real exchange sync API call
+    fetch('/api/gate/update-sltp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            symbol: activeTradeData.symbol.replace('USDT', '_USDT'),
+            sl: slVal,
+            tp: tpVal
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            activeTradeData.sl = slVal;
+            activeTradeData.tp = tpVal;
+            let uid = localStorage.getItem('crypto_user_uid');
+            saveUserPersistedData(uid);
+            updateActiveTradePnL(activeTradeData.currentPrice || activeTradeData.entryPrice);
+            showStylishPopup('SL and TP successfully updated on real exchange!', 'success');
+        } else {
+            showStylishPopup(data.error || 'Failed to update SL/TP on exchange.', 'error');
+        }
+    })
+    .catch(err => {
+        showStylishPopup('Server error while syncing SL/TP with exchange.', 'error');
+    });
+};
 
 function renderActiveHolding() {
     let holdingTbody = document.getElementById('active-holding-tbody');
@@ -342,11 +393,18 @@ window.closeActiveHolding = async function() {
             signalsTbody.innerHTML = '';
         }
         let pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
+        let pnlText = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+        let safeSymbol = activeTradeData.symbol;
+        let safeCapital = activeTradeData.capital.toFixed(2);
+
         let newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td style="padding: 8px; font-weight:bold;">${activeTradeData.symbol}</td>
-            <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
-            <td style="padding: 8px;">$${activeTradeData.capital.toFixed(2)}</td>
+            <td style="padding: 8px; font-weight:bold;">${safeSymbol}</td>
+            <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnlText}</td>
+            <td style="padding: 8px;">$${safeCapital}</td>
+            <td style="padding: 8px; text-align: right;">
+                <button onclick="openShareModal('${safeSymbol}', '${pnlText}', '$${safeCapital}')" style="background:#238636; color:#fff; border:none; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">📤 Share Card</button>
+            </td>
         `;
         signalsTbody.prepend(newRow);
     }
@@ -369,6 +427,62 @@ window.closeActiveHolding = async function() {
     if (activeTradesEl) activeTradesEl.innerText = "0";
 
     showStylishPopup('Position closed successfully & balance updated.', 'success');
+};
+
+// Feature 1: Trade Profit Share Card Modal Function
+window.openShareModal = function(symbol, pnl, capital) {
+    let existingModal = document.getElementById('share-card-modal');
+    if (existingModal) existingModal.remove();
+
+    let modal = document.createElement('div');
+    modal.id = 'share-card-modal';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.background = 'rgba(0,0,0,0.8)';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    modal.style.zIndex = '999999';
+
+    modal.innerHTML = `
+        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; width: 320px; color: #fff; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.7);">
+            <h3 style="margin-bottom: 15px; color: #58a6ff;">🚀 Crypto Bot Pro Share Card</h3>
+            <div id="share-card-preview" style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: left;">
+                <p style="margin: 5px 0;"><strong>Pair:</strong> <span id="sc-pair">${symbol}</span></p>
+                <p style="margin: 5px 0;"><strong>Profit/Loss:</strong> <span id="sc-pnl" style="color: ${pnl.includes('+') ? '#3fb950' : '#f85149'};">${pnl}</span></p>
+                <p style="margin: 5px 0;"><strong>Capital Used:</strong> <span id="sc-cap">${capital}</span></p>
+                <p style="margin: 5px 0; font-size: 11px; color: #8b949e;">Strategy: Strict SMC / FMA Filter</p>
+            </div>
+            <div style="margin-bottom: 15px; text-align: left; font-size: 12px; color: #c9d1d9;">
+                <label><input type="checkbox" id="chk-pair" checked> Include Pair</label><br>
+                <label><input type="checkbox" id="chk-pnl" checked> Include PnL</label><br>
+                <label><input type="checkbox" id="chk-cap" checked> Include Capital</label>
+            </div>
+            <button onclick="executeShareAction('${symbol}', '${pnl}', '${capital}')" style="background: #238636; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 8px;">📋 Copy & Share Text</button>
+            <button onclick="document.getElementById('share-card-modal').remove()" style="background: #da3633; color: #fff; border: none; padding: 6px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%;">Close</button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+window.executeShareAction = function(symbol, pnl, capital) {
+    let includePair = document.getElementById('chk-pair')?.checked;
+    let includePnl = document.getElementById('chk-pnl')?.checked;
+    let includeCap = document.getElementById('chk-cap')?.checked;
+
+    let shareText = `🔥 My Crypto Bot Pro Trade Result:\n`;
+    if (includePair) shareText += `🔹 Pair: ${symbol}\n`;
+    if (includePnl) shareText += `💰 PnL: ${pnl}\n`;
+    if (includeCap) shareText += `💵 Capital: ${capital}\n`;
+    shareText += `🚀 Powered by FMA Strict Strategy!`;
+
+    navigator.clipboard.writeText(shareText);
+    showStylishPopup('Trade share card text copied to clipboard successfully!', 'success');
+    document.getElementById('share-card-modal')?.remove();
 };
 
 window.showCoinDropdown = function() {
@@ -461,7 +575,6 @@ window.copyAdminCode = function(codeText) {
     showStylishPopup(`Passcode ${codeText} copied to clipboard!`, 'success');
 };
 
-// Strict Strategy Check: Jab tak valid setup nahi hoga, yeh false return karega aur trade execute nahi hogi
 function checkStrictStrategyConditions() {
     return false; 
 }
