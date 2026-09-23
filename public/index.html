@@ -334,6 +334,16 @@
         </div>
     </div>
 
+    <!-- Corrected PnL Percentage Calculation Script Logic -->
+    <script>
+        // Spot PnL calculation helper function ensuring exact percentage
+        function updateSpotPnL(entryPrice, currentPrice) {
+            if (!entryPrice || entryPrice <= 0) return { percent: 0, pnlUsd: 0 };
+            const diff = currentPrice - entryPrice;
+            const percent = (diff / entryPrice) * 100;
+            return percent;
+        }
+    </script>
     <script src="script.js"></script>
 </body>
 </html>
