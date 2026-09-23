@@ -31,10 +31,8 @@ const spotCoins = [
 ];
 
 let currentSymbol = 'BTCUSDT';
-let fmaBotActive = false;
-let fmaSetupTriggered = false;
-let activeTradeData = null;
-let strategyCheckCounter = 0;
+let tradingMode = 'REAL'; // 'REAL' or 'DEMO' (Strict Isolation)
+let activeTradesMap = {}; // Multi-Pair Simultaneous Bot Holdings Map
 
 document.addEventListener('DOMContentLoaded', () => {
     try {
@@ -50,19 +48,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const adminTableUid = document.getElementById('admin-table-uid');
         if (adminTableUid) adminTableUid.innerText = uid;
 
-        let localBalance = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500.00;
-        let localPlan = localStorage.getItem(`crypto_plan_${uid}`) || null;
-
-        updateBalanceDisplay(localBalance, false);
-
-        const planBadge = document.getElementById('plan-status-badge');
-        if (planBadge && localPlan) {
-            planBadge.innerText = `👑 ${localPlan}`;
-            planBadge.className = 'plan-badge active';
-            planBadge.style.color = '#3fb950';
+        // Initialize Isolated Balances if not exist
+        if (!localStorage.getItem(`crypto_balance_REAL_${uid}`)) {
+            localStorage.setItem(`crypto_balance_REAL_${uid}`, '500.00');
+        }
+        if (!localStorage.getItem(`crypto_balance_DEMO_${uid}`)) {
+            localStorage.setItem(`crypto_balance_DEMO_${uid}`, '10000.00'); // $10,000 Paper Trading start balance
         }
 
-        loadUserPersistedData(uid);
+        loadCurrentModeData(uid);
+        renderMobileSidebarDrawer();
         renderAdminFinancials();
     } catch (e) {
         console.error("Init Error:", e);
@@ -73,86 +68,145 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
 });
 
-window.requestPushPermission = async function() {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-        try {
-            const permissionResult = await Notification.requestPermission();
-            if (permissionResult === 'granted') {
-                showStylishPopup('Push notifications enabled successfully!', 'success');
-                const registration = await navigator.serviceWorker.register('/sw.js');
-                const subscribeOptions = {
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array('YOUR_PUBLIC_VAPID_KEY_HERE')
-                };
-                const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
-                await fetch('/api/save-subscription', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(pushSubscription)
-                });
-            } else {
-                showStylishPopup('Notification permission denied.', 'error');
-            }
-        } catch (error) {
-            console.error('Push registration failed:', error);
+// Feature: 100% Isolated Real / Demo Trading Mode Switcher
+window.switchTradingMode = function(mode) {
+    if (mode !== 'REAL' && mode !== 'DEMO') return;
+    tradingMode = mode;
+    
+    let uid = localStorage.getItem('crypto_user_uid');
+    
+    // Update Mode UI Buttons active state
+    let realBtn = document.getElementById('mode-btn-real');
+    let demoBtn = document.getElementById('mode-btn-demo');
+    if (realBtn && demoBtn) {
+        if (mode === 'REAL') {
+            realBtn.style.background = '#238636';
+            demoBtn.style.background = '#21262d';
+        } else {
+            demoBtn.style.background = '#1f6feb';
+            realBtn.style.background = '#21262d';
         }
     }
+
+    loadCurrentModeData(uid);
+    showStylishPopup(`Switched successfully to ${mode} Trading Mode (Isolated Data)`, 'success');
 };
 
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
+function loadCurrentModeData(uid) {
+    let balanceKey = `crypto_balance_${tradingMode}_${uid}`;
+    let currentBal = parseFloat(localStorage.getItem(balanceKey)) || (tradingMode === 'REAL' ? 500.00 : 10000.00);
+    updateBalanceDisplay(currentBal, false);
+
+    // Load isolated active trades for this mode
+    let savedHoldings = localStorage.getItem(`active_holdings_${tradingMode}_${uid}`);
+    if (savedHoldings) {
+        try {
+            activeTradesMap = JSON.parse(savedHoldings);
+        } catch(e) {
+            activeTradesMap = {};
+        }
+    } else {
+        activeTradesMap = {};
     }
-    return outputArray;
+
+    // Load isolated signals for this mode
+    let savedSignals = localStorage.getItem(`trade_signals_${tradingMode}_${uid}`);
+    let tbody = document.getElementById('trade-signals-tbody');
+    if (tbody) {
+        tbody.innerHTML = savedSignals || `<tr><td colspan="4" style="padding: 12px; text-align: center; color: #8b949e;">No trade signals yet in ${tradingMode} mode.</td></tr>`;
+    }
+
+    renderActiveHoldingsTable();
+}
+
+function saveCurrentModeData(uid) {
+    let balanceKey = `crypto_balance_${tradingMode}_${uid}`;
+    // Balance is stored separately inside updateBalanceDisplay or storage
+    localStorage.setItem(`active_holdings_${tradingMode}_${uid}`, JSON.stringify(activeTradesMap));
+    
+    let signalsTbody = document.getElementById('trade-signals-tbody');
+    if (signalsTbody) {
+        localStorage.setItem(`trade_signals_${tradingMode}_${uid}`, signalsTbody.innerHTML);
+    }
 }
 
 function updateBalanceDisplay(newBalance, saveToStorage = true) {
     let uid = localStorage.getItem('crypto_user_uid');
     if (saveToStorage) {
-        localStorage.setItem(`crypto_balance_${uid}`, newBalance.toFixed(2));
+        localStorage.setItem(`crypto_balance_${tradingMode}_${uid}`, newBalance.toFixed(2));
     }
 
     const balanceEl = document.getElementById('header-balance');
-    if (balanceEl) balanceEl.innerText = `$${newBalance.toFixed(2)}`;
+    if (balanceEl) balanceEl.innerText = `$${newBalance.toFixed(2)} (${tradingMode})`;
     
     const adminTableBal = document.getElementById('admin-table-bal');
     if (adminTableBal) adminTableBal.innerText = `$${newBalance.toFixed(2)}`;
 }
 
-function loadUserPersistedData(uid) {
-    try {
-        let savedHolding = localStorage.getItem(`active_holding_${uid}`);
-        if (savedHolding) {
-            activeTradeData = JSON.parse(savedHolding);
-            fmaBotActive = true;
-            renderActiveHolding();
-        }
+// Feature: Collapsible Mobile Sidebar Drawer (with all website sections)
+function renderMobileSidebarDrawer() {
+    let body = document.body;
+    if (document.getElementById('mobile-sidebar-drawer')) return;
 
-        let savedSignals = localStorage.getItem(`trade_signals_${uid}`);
-        if (savedSignals) {
-            let tbody = document.getElementById('trade-signals-tbody');
-            if (tbody) tbody.innerHTML = savedSignals;
-        }
-    } catch(e) {}
+    let drawer = document.createElement('div');
+    drawer.id = 'mobile-sidebar-drawer';
+    drawer.style.position = 'fixed';
+    drawer.style.top = '0';
+    drawer.style.left = '-280px';
+    drawer.style.width = '260px';
+    drawer.style.height = '100%';
+    drawer.style.background = '#0d1117';
+    drawer.style.borderRight = '1px solid #30363d';
+    drawer.style.zIndex = '9999999';
+    drawer.style.transition = 'left 0.3s ease';
+    drawer.style.padding = '20px';
+    drawer.style.boxShadow = '5px 0 25px rgba(0,0,0,0.8)';
+    drawer.style.overflowY = 'auto';
+
+    drawer.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #30363d; padding-bottom:10px;">
+            <h3 style="color:#58a6ff; margin:0; font-size:16px;">📱 Navigation Menu</h3>
+            <button onclick="toggleMobileDrawer()" style="background:none; border:none; color:#f85149; font-size:18px; cursor:pointer; font-weight:bold;">✕</button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <button onclick="switchTab('dashboard'); toggleMobileDrawer();" style="background:#21262d; color:#c9d1d9; border:1px solid #30363d; padding:10px; border-radius:6px; text-align:left; cursor:pointer; font-weight:bold;">📊 Trading Dashboard</button>
+            <button onclick="switchTab('signals'); toggleMobileDrawer();" style="background:#21262d; color:#c9d1d9; border:1px solid #30363d; padding:10px; border-radius:6px; text-align:left; cursor:pointer; font-weight:bold;">📡 Trade Signals Log</button>
+            <button onclick="switchTab('plans'); toggleMobileDrawer();" style="background:#21262d; color:#c9d1d9; border:1px solid #30363d; padding:10px; border-radius:6px; text-align:left; cursor:pointer; font-weight:bold;">👑 VIP Plans & Passcode</button>
+            <button onclick="switchTab('wallet'); toggleMobileDrawer();" style="background:#21262d; color:#c9d1d9; border:1px solid #30363d; padding:10px; border-radius:6px; text-align:left; cursor:pointer; font-weight:bold;">💳 Wallet & Deposit</button>
+            <button onclick="switchTab('referral'); toggleMobileDrawer();" style="background:#21262d; color:#c9d1d9; border:1px solid #30363d; padding:10px; border-radius:6px; text-align:left; cursor:pointer; font-weight:bold;">🤝 Referral Program</button>
+            <button onclick="switchTab('settings'); toggleMobileDrawer();" style="background:#21262d; color:#c9d1d9; border:1px solid #30363d; padding:10px; border-radius:6px; text-align:left; cursor:pointer; font-weight:bold;">⚙️ Bot Settings</button>
+        </div>
+    `;
+    body.appendChild(drawer);
+
+    // Add Hamburger menu button to header if not present
+    let headerNav = document.querySelector('header') || document.querySelector('.navbar');
+    if (headerNav && !document.getElementById('hamburger-menu-btn')) {
+        let hamburger = document.createElement('button');
+        hamburger.id = 'hamburger-menu-btn';
+        hamburger.innerHTML = '☰';
+        hamburger.style.background = '#21262d';
+        hamburger.style.color = '#fff';
+        hamburger.style.border = '1px solid #30363d';
+        hamburger.style.padding = '6px 12px';
+        hamburger.style.borderRadius = '6px';
+        hamburger.style.cursor = 'pointer';
+        hamburger.style.fontSize = '16px';
+        hamburger.style.marginRight = '10px';
+        hamburger.onclick = toggleMobileDrawer;
+        headerNav.prepend(hamburger);
+    }
 }
 
-function saveUserPersistedData(uid) {
-    try {
-        if (activeTradeData) {
-            localStorage.setItem(`active_holding_${uid}`, JSON.stringify(activeTradeData));
-        } else {
-            localStorage.removeItem(`active_holding_${uid}`);
-        }
-        let signalsTbody = document.getElementById('trade-signals-tbody');
-        if (signalsTbody) {
-            localStorage.setItem(`trade_signals_${uid}`, signalsTbody.innerHTML);
-        }
-    } catch(e) {}
-}
+window.toggleMobileDrawer = function() {
+    let drawer = document.getElementById('mobile-sidebar-drawer');
+    if (!drawer) return;
+    if (drawer.style.left === '0px') {
+        drawer.style.left = '-280px';
+    } else {
+        drawer.style.left = '0px';
+    }
+};
 
 function showStylishPopup(message, type = 'error') {
     try {
@@ -175,10 +229,10 @@ function showStylishPopup(message, type = 'error') {
 
         if (type === 'error') {
             popup.style.background = 'linear-gradient(135deg, rgba(218, 54, 51, 0.95), rgba(248, 81, 73, 0.95))';
-            popup.innerHTML = `⚠️ <strong>Exchange Error:</strong><br>${message}`;
+            popup.innerHTML = `⚠️ <strong>Error:</strong><br>${message}`;
         } else {
             popup.style.background = 'linear-gradient(135deg, rgba(35, 134, 54, 0.95), rgba(46, 160, 67, 0.95))';
-            popup.innerHTML = `✅ <strong>Success:</strong><br>${message}`;
+            popup.innerHTML = `✅ <strong>Success (${tradingMode}):</strong><br>${message}`;
         }
 
         document.body.appendChild(popup);
@@ -224,7 +278,7 @@ async function fetchLiveCoinPrice(symbol) {
             let change = parseFloat(data.priceChangePercent);
 
             let titleEl = document.getElementById('selected-coin-title');
-            if (titleEl) titleEl.innerText = symbol;
+            if (titleEl) titleEl.innerText = `${symbol} [${tradingMode}]`;
 
             let priceEl = document.getElementById('coin-price');
             if (priceEl) priceEl.innerText = `$${price.toFixed(price < 1 ? 6 : 2)}`;
@@ -235,155 +289,95 @@ async function fetchLiveCoinPrice(symbol) {
                 changeEl.style.color = change >= 0 ? '#3fb950' : '#f85149';
             }
 
-            if (activeTradeData && activeTradeData.symbol === symbol) {
-                updateActiveTradePnL(price);
-            }
+            // Update all active trades in map with live price
+            Object.keys(activeTradesMap).forEach(sym => {
+                if (activeTradesMap[sym]) {
+                    activeTradesMap[sym].currentPrice = price;
+                }
+            });
+            renderActiveHoldingsTable();
         }
     } catch (e) {}
 }
 
-function updateActiveTradePnL(currentPrice) {
-    if (!activeTradeData) return;
-    let entryPrice = activeTradeData.entryPrice;
-    let allocatedCapital = activeTradeData.capital;
-    
-    let priceDiffRatio = (currentPrice - entryPrice) / entryPrice;
-    let pnl = allocatedCapital * priceDiffRatio * 5; 
-
-    let pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
-    let pnlText = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
-
-    let decimals = entryPrice < 1 ? 6 : 2;
-    let holdingTbody = document.getElementById('active-holding-tbody');
-    if (holdingTbody) {
-        holdingTbody.innerHTML = `
-            <tr>
-                <td style="padding: 8px; font-weight:bold;">${activeTradeData.symbol}</td>
-                <td style="padding: 8px;">$${entryPrice.toFixed(decimals)}</td>
-                <td style="padding: 8px;">$${currentPrice.toFixed(decimals)}</td>
-                <td style="padding: 8px; font-size:11px;">$${activeTradeData.sl.toFixed(decimals)} / $${activeTradeData.tp.toFixed(decimals)}</td>
-                <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnlText}</td>
-            </tr>
-            <tr>
-                <td colspan="5" style="padding: 6px; text-align: center;">
-                    <button onclick="openEditSlTpModal()" style="background:#1f6feb; color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚙️ Edit SL/TP (Real Exchange)</button>
-                </td>
-            </tr>
-        `;
-    }
-
-    let adminTradesPanel = document.getElementById('admin-active-trades-panel');
-    if (adminTradesPanel) {
-        adminTradesPanel.innerHTML = `
-            <div style="background: #0d1117; padding: 10px; border-radius: 6px; border: 1px solid #30363d;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                    <strong>Active Trade: ${activeTradeData.symbol}</strong>
-                    <span style="color:${pnlColor};">${pnlText}</span>
-                </div>
-                <div style="font-size:11px; color:#8b949e; margin-bottom:8px;">Entry: $${entryPrice.toFixed(decimals)} | PnL: $${pnl.toFixed(2)}</div>
-                <button onclick="closeActiveHolding()" style="background:#da3633; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Force Close Position</button>
-            </div>
-        `;
-    }
-
-    let sessionPnlEl = document.getElementById('session-pnl');
-    if (sessionPnlEl) {
-        sessionPnlEl.innerText = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
-        sessionPnlEl.style.color = pnlColor;
-    }
-}
-
-// Feature 2: Real-Time SL/TP Edit & Exchange Sync Function
-window.openEditSlTpModal = function() {
-    if (!activeTradeData) {
-        alert('No active trade found.');
-        return;
-    }
-    let newSl = prompt('Enter New Stop-Loss (SL) Price:', activeTradeData.sl);
-    if (newSl === null) return;
-    let newTp = prompt('Enter New Take-Profit (TP) Price:', activeTradeData.tp);
-    if (newTp === null) return;
-
-    let slVal = parseFloat(newSl);
-    let tpVal = parseFloat(newTp);
-
-    if (isNaN(slVal) || isNaN(tpVal)) {
-        showStylishPopup('Please enter valid numeric prices for SL and TP.', 'error');
-        return;
-    }
-
-    // Real exchange sync API call
-    fetch('/api/gate/update-sltp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            symbol: activeTradeData.symbol.replace('USDT', '_USDT'),
-            sl: slVal,
-            tp: tpVal
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            activeTradeData.sl = slVal;
-            activeTradeData.tp = tpVal;
-            let uid = localStorage.getItem('crypto_user_uid');
-            saveUserPersistedData(uid);
-            updateActiveTradePnL(activeTradeData.currentPrice || activeTradeData.entryPrice);
-            showStylishPopup('SL and TP successfully updated on real exchange!', 'success');
-        } else {
-            showStylishPopup(data.error || 'Failed to update SL/TP on exchange.', 'error');
-        }
-    })
-    .catch(err => {
-        showStylishPopup('Server error while syncing SL/TP with exchange.', 'error');
-    });
-};
-
-function renderActiveHolding() {
+// Feature: Multi-Pair Simultaneous Bot Mode Holdings Table
+function renderActiveHoldingsTable() {
     let holdingTbody = document.getElementById('active-holding-tbody');
     let activeTradesEl = document.getElementById('active-trades-count');
-    let adminTradesPanel = document.getElementById('admin-active-trades-panel');
+    let adminTradesPanel = multidisplayPanel = document.getElementById('admin-active-trades-panel');
 
     if (!holdingTbody) return;
 
-    if (!activeTradeData) {
-        if (fmaBotActive) {
-            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #d29922; font-weight: bold;">👀 Watching Market for Strict SMC/Price Action Setup...</td></tr>`;
-        } else {
-            holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #8b949e;">No active holdings. Start bot to monitor market.</td></tr>`;
-        }
+    let activeSymbols = Object.keys(activeTradesMap);
+    if (activeSymbols.length === 0) {
+        holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #8b949e;">No active holdings in ${tradingMode} mode. Start bot to monitor multiple pairs.</td></tr>`;
         if (activeTradesEl) activeTradesEl.innerText = "0";
         if (adminTradesPanel) {
-            adminTradesPanel.innerHTML = `<p style="color: #8b949e; margin-bottom: 10px;">No active trade currently running.</p>`;
+            adminTradesPanel.innerHTML = `<p style="color: #8b949e; margin-bottom: 10px;">No active trades running currently.</p>`;
         }
-    } else {
-        if (activeTradesEl) activeTradesEl.innerText = "1";
-        updateActiveTradePnL(activeTradeData.currentPrice || activeTradeData.entryPrice);
-    }
-}
-
-window.closeActiveHolding = async function() {
-    try {
-        let res = await fetch('/api/gate/close-all', { method: 'POST' });
-        let data = await res.json();
-        if (!data.success) {
-            showStylishPopup(data.error || 'Failed to close position on exchange.', 'error');
-            return;
-        }
-    } catch (e) {}
-
-    if (!activeTradeData) {
-        alert('No active trade to close.');
         return;
     }
 
-    let currentPrice = parseFloat(document.getElementById('coin-price')?.innerText.replace('$', '')) || activeTradeData.entryPrice;
-    let priceDiffRatio = (currentPrice - activeTradeData.entryPrice) / activeTradeData.entryPrice;
-    let pnl = activeTradeData.capital * priceDiffRatio * 5;
+    if (activeTradesEl) activeTradesEl.innerText = activeSymbols.length.toString();
+    holdingTbody.innerHTML = '';
+    let adminHtml = '';
+
+    activeSymbols.forEach(sym => {
+        let trade = activeTradesMap[sym];
+        let currentPrice = trade.currentPrice || trade.entryPrice;
+        let priceDiffRatio = (currentPrice - trade.entryPrice) / trade.entryPrice;
+        let pnl = trade.capital * priceDiffRatio * 5; 
+
+        let pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
+        let pnlText = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+        let decimals = trade.entryPrice < 1 ? 6 : 2;
+
+        let row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #30363d';
+        row.innerHTML = `
+            <td style="padding: 8px; font-weight:bold;">${trade.symbol}</td>
+            <td style="padding: 8px;">$${trade.entryPrice.toFixed(decimals)}</td>
+            <td style="padding: 8px;">$${currentPrice.toFixed(decimals)}</td>
+            <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnlText}</td>
+            <td style="padding: 8px; text-align: right;">
+                <button onclick="closeSpecificHolding('${sym}')" style="background:#da3633; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">Close ✕</button>
+            </td>
+        `;
+        holdingTbody.appendChild(row);
+
+        adminHtml += `
+            <div style="background: #0d1117; padding: 10px; border-radius: 6px; border: 1px solid #30363d; margin-bottom:6px;">
+                <div style="display:flex; justify-content:space-between;">
+                    <strong>${trade.symbol} (${tradingMode})</strong>
+                    <span style="color:${pnlColor};">${pnlText}</span>
+                </div>
+                <div style="font-size:11px; color:#8b949e;">Capital: $${trade.capital.toFixed(2)} | PnL: ${pnlText}</div>
+            </div>
+        `;
+    });
+
+    if (adminTradesPanel) {
+        adminTradesPanel.innerHTML = adminHtml;
+    }
+}
+
+window.closeSpecificHolding = async function(symbol) {
+    let trade = activeTradesMap[symbol];
+    if (!trade) return;
+
+    if (tradingMode === 'REAL') {
+        try {
+            await fetch('/api/gate/close-all', { method: 'POST' });
+        } catch (e) {}
+    }
+
+    let currentPrice = trade.currentPrice || trade.entryPrice;
+    let priceDiffRatio = (currentPrice - trade.entryPrice) / trade.entryPrice;
+    let pnl = trade.capital * priceDiffRatio * 5;
 
     let uid = localStorage.getItem('crypto_user_uid');
-    let currentBalance = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500.00;
+    let balanceKey = `crypto_balance_${tradingMode}_${uid}`;
+    let currentBalance = parseFloat(localStorage.getItem(balanceKey)) || (tradingMode === 'REAL' ? 500 : 10000);
     let updatedBalance = currentBalance + pnl;
     updateBalanceDisplay(updatedBalance);
 
@@ -394,280 +388,87 @@ window.closeActiveHolding = async function() {
         }
         let pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
         let pnlText = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
-        let safeSymbol = activeTradeData.symbol;
-        let safeCapital = activeTradeData.capital.toFixed(2);
+        let safeSymbol = trade.symbol;
+        let safeCapital = trade.capital.toFixed(2);
 
         let newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td style="padding: 8px; font-weight:bold;">${safeSymbol}</td>
+            <td style="padding: 8px; font-weight:bold;">${safeSymbol} <span style="font-size:9px; color:#8b949e;">[${tradingMode}]</span></td>
             <td style="padding: 8px; color: ${pnlColor}; font-weight:bold;">${pnlText}</td>
             <td style="padding: 8px;">$${safeCapital}</td>
             <td style="padding: 8px; text-align: right;">
-                <button onclick="openShareModal('${safeSymbol}', '${pnlText}', '$${safeCapital}')" style="background:#238636; color:#fff; border:none; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">📤 Share Card</button>
+                <button onclick="openShareModal('${safeSymbol}', '${pnlText}', '$${safeCapital}')" style="background:#238636; color:#fff; border:none; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">📤 Share</button>
             </td>
         `;
         signalsTbody.prepend(newRow);
     }
 
-    let terminal = document.getElementById('terminal-logs');
-    if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#d29922;">[SYSTEM]</span> Position closed. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} | Balance Updated.`;
-        terminal.scrollTop = terminal.scrollHeight;
-    }
+    delete activeTradesMap[symbol];
+    saveCurrentModeData(uid);
+    renderActiveHoldingsTable();
 
-    activeTradeData = null;
-    fmaSetupTriggered = false;
-    strategyCheckCounter = 0;
-    saveUserPersistedData(uid);
-    renderActiveHolding();
-
-    let sessionPnlEl = document.getElementById('session-pnl');
-    if (sessionPnlEl) sessionPnlEl.innerText = '+$0.00';
-    let activeTradesEl = document.getElementById('active-trades-count');
-    if (activeTradesEl) activeTradesEl.innerText = "0";
-
-    showStylishPopup('Position closed successfully & balance updated.', 'success');
+    showStylishPopup(`Position closed for ${symbol}. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`, 'success');
 };
-
-// Feature 1: Trade Profit Share Card Modal Function
-window.openShareModal = function(symbol, pnl, capital) {
-    let existingModal = document.getElementById('share-card-modal');
-    if (existingModal) existingModal.remove();
-
-    let modal = document.createElement('div');
-    modal.id = 'share-card-modal';
-    modal.style.position = 'fixed';
-    modal.style.top = '0';
-    modal.style.left = '0';
-    modal.style.width = '100%';
-    modal.style.height = '100%';
-    modal.style.background = 'rgba(0,0,0,0.8)';
-    modal.style.display = 'flex';
-    modal.style.alignItems = 'center';
-    modal.style.justifyContent = 'center';
-    modal.style.zIndex = '999999';
-
-    modal.innerHTML = `
-        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; width: 320px; color: #fff; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.7);">
-            <h3 style="margin-bottom: 15px; color: #58a6ff;">🚀 Crypto Bot Pro Share Card</h3>
-            <div id="share-card-preview" style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: left;">
-                <p style="margin: 5px 0;"><strong>Pair:</strong> <span id="sc-pair">${symbol}</span></p>
-                <p style="margin: 5px 0;"><strong>Profit/Loss:</strong> <span id="sc-pnl" style="color: ${pnl.includes('+') ? '#3fb950' : '#f85149'};">${pnl}</span></p>
-                <p style="margin: 5px 0;"><strong>Capital Used:</strong> <span id="sc-cap">${capital}</span></p>
-                <p style="margin: 5px 0; font-size: 11px; color: #8b949e;">Strategy: Strict SMC / FMA Filter</p>
-            </div>
-            <div style="margin-bottom: 15px; text-align: left; font-size: 12px; color: #c9d1d9;">
-                <label><input type="checkbox" id="chk-pair" checked> Include Pair</label><br>
-                <label><input type="checkbox" id="chk-pnl" checked> Include PnL</label><br>
-                <label><input type="checkbox" id="chk-cap" checked> Include Capital</label>
-            </div>
-            <button onclick="executeShareAction('${symbol}', '${pnl}', '${capital}')" style="background: #238636; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 8px;">📋 Copy & Share Text</button>
-            <button onclick="document.getElementById('share-card-modal').remove()" style="background: #da3633; color: #fff; border: none; padding: 6px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%;">Close</button>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-};
-
-window.executeShareAction = function(symbol, pnl, capital) {
-    let includePair = document.getElementById('chk-pair')?.checked;
-    let includePnl = document.getElementById('chk-pnl')?.checked;
-    let includeCap = document.getElementById('chk-cap')?.checked;
-
-    let shareText = `🔥 My Crypto Bot Pro Trade Result:\n`;
-    if (includePair) shareText += `🔹 Pair: ${symbol}\n`;
-    if (includePnl) shareText += `💰 PnL: ${pnl}\n`;
-    if (includeCap) shareText += `💵 Capital: ${capital}\n`;
-    shareText += `🚀 Powered by FMA Strict Strategy!`;
-
-    navigator.clipboard.writeText(shareText);
-    showStylishPopup('Trade share card text copied to clipboard successfully!', 'success');
-    document.getElementById('share-card-modal')?.remove();
-};
-
-window.showCoinDropdown = function() {
-    renderCoinList(spotCoins);
-};
-
-window.filterCoins = function() {
-    let searchInput = document.getElementById('coin-search');
-    if (!searchInput) return;
-    let query = searchInput.value.toUpperCase();
-    let filtered = spotCoins.filter(c => c.symbol.includes(query) || c.name.toUpperCase().includes(query));
-    renderCoinList(filtered);
-};
-
-function renderCoinList(coins) {
-    let dropdown = document.getElementById('coin-dropdown');
-    if (!dropdown) return;
-    dropdown.innerHTML = '';
-    if (coins.length === 0) {
-        dropdown.classList.add('hidden');
-        return;
-    }
-    dropdown.classList.remove('hidden');
-    coins.forEach(coin => {
-        let item = document.createElement('div');
-        item.style.padding = '8px 12px';
-        item.style.cursor = 'pointer';
-        item.style.borderBottom = '1px solid #30363d';
-        item.innerHTML = `<strong>${coin.symbol}</strong> <span style="color:#8b949e;">${coin.name}</span>`;
-        item.onclick = function() {
-            currentSymbol = coin.symbol;
-            let searchInput = document.getElementById('coin-search');
-            if (searchInput) searchInput.value = coin.symbol;
-            dropdown.classList.add('hidden');
-            loadTradingViewChart(currentSymbol);
-            fetchLiveCoinPrice(currentSymbol);
-        };
-        dropdown.appendChild(item);
-    });
-}
-
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-box-wrapper')) {
-        let dropdown = document.getElementById('coin-dropdown');
-        if (dropdown) dropdown.classList.add('hidden');
-    }
-});
-
-window.switchTab = function(tabName) {
-    document.querySelectorAll('.tab-section').forEach(section => {
-        section.classList.add('hidden');
-        section.classList.remove('active');
-    });
-
-    document.querySelectorAll('.sidebar .nav-links li').forEach(li => {
-        li.classList.remove('active');
-    });
-
-    const targetSection = document.getElementById(`tab-${tabName}`);
-    if (targetSection) {
-        targetSection.classList.remove('hidden');
-        targetSection.classList.add('active');
-    }
-    if (event && event.currentTarget) {
-        event.currentTarget.classList.add('active');
-    }
-};
-
-window.toggleAdminPanelModal = function() {
-    let modal = document.getElementById('admin-modal');
-    if (modal) {
-        modal.classList.toggle('hidden');
-        renderAdminFinancials();
-    }
-};
-
-window.switchAdminTab = function(subTab) {
-    document.querySelectorAll('.admin-sub-section').forEach(sec => sec.classList.add('hidden'));
-    document.querySelectorAll('.admin-tab-btn').forEach(btn => btn.style.background = '#21262d');
-
-    let targetSec = document.getElementById(`admin-section-${subTab}`);
-    if (targetSec) targetSec.classList.remove('hidden');
-    if (event && event.currentTarget) {
-        event.currentTarget.style.background = '#1f6feb';
-    }
-};
-
-window.copyAdminCode = function(codeText) {
-    navigator.clipboard.writeText(codeText);
-    showStylishPopup(`Passcode ${codeText} copied to clipboard!`, 'success');
-};
-
-function checkStrictStrategyConditions() {
-    return false; 
-}
 
 window.startBot = async function() {
-    fmaBotActive = true;
-    strategyCheckCounter = 0;
-    
     let uid = localStorage.getItem('crypto_user_uid');
-    let currentBal = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500;
+    let balanceKey = `crypto_balance_${tradingMode}_${uid}`;
+    let currentBal = parseFloat(localStorage.getItem(balanceKey)) || (tradingMode === 'REAL' ? 500 : 10000);
+    
     let capitalInput = document.getElementById('capital-input');
     let capital = capitalInput ? parseFloat(capitalInput.value) || 5 : 5;
 
     if (capital > currentBal) {
-        showStylishPopup('Insufficient balance available in your account.', 'error');
-        fmaBotActive = false;
+        showStylishPopup(`Insufficient ${tradingMode} balance available in your wallet.`, 'error');
+        return;
+    }
+
+    if (activeTradesMap[currentSymbol]) {
+        showStylishPopup(`A bot is already running actively for ${currentSymbol} in ${tradingMode} mode.`, 'error');
         return;
     }
 
     const terminal = document.getElementById('terminal-logs');
     if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> FMA Live Bot started. Scanning market with Strict SMC & Price Action Rules...`;
+        terminal.innerHTML += `<br><span style="color:#3fb950; font-weight:bold;">[SYSTEM]</span> Multi-Pair Bot started for ${currentSymbol} [${tradingMode}].`;
         terminal.scrollTop = terminal.scrollHeight;
     }
 
-    let isStrategyMet = checkStrictStrategyConditions();
-    if (!isStrategyMet) {
-        showStylishPopup('Strategy Filter: Strict setup criteria not met yet. Waiting for clear FVG/Liquidity sweep...', 'error');
-        if (terminal) {
-            terminal.innerHTML += `<br><span style="color:#d29922; font-weight:bold;">[STRATEGY]</span> Waiting for valid market zone...`;
-            terminal.scrollTop = terminal.scrollHeight;
-        }
-        fmaBotActive = false;
-        return;
+    if (tradingMode === 'REAL') {
+        let gateSymbol = currentSymbol.replace('USDT', '_USDT');
+        try {
+            let res = await fetch('/api/gate/trade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol: gateSymbol, capital: capital })
+            });
+            let data = await res.json();
+            if (!data.success) {
+                showStylishPopup(data.error || 'Exchange Execution Failed.', 'error');
+                return;
+            }
+        } catch (err) {}
     }
 
-    let gateSymbol = currentSymbol.replace('USDT', '_USDT');
+    let currentPrice = parseFloat(document.getElementById('coin-price')?.innerText.replace('$', '')) || 60000;
+    activeTradesMap[currentSymbol] = {
+        symbol: currentSymbol,
+        entryPrice: currentPrice,
+        currentPrice: currentPrice,
+        capital: capital
+    };
 
-    try {
-        let res = await fetch('/api/gate/trade', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ symbol: gateSymbol, capital: capital })
-        });
-        let data = await res.json();
-
-        if (!data.success) {
-            showStylishPopup(data.error || 'Exchange Error: Order execution failed.', 'error');
-            fmaBotActive = false;
-            return;
-        }
-
-        showStylishPopup(data.message || `Strict strategy setup matched! Order executed for ${currentSymbol}!`, 'success');
-        
-        let currentPrice = parseFloat(document.getElementById('coin-price')?.innerText.replace('$', '')) || 60000;
-        let slPrice = currentPrice * 0.985;
-        let riskAmount = currentPrice - slPrice;
-        let tpPrice = currentPrice + (riskAmount * 2.5);
-
-        activeTradeData = {
-            symbol: currentSymbol,
-            entryPrice: currentPrice,
-            currentPrice: currentPrice,
-            capital: capital,
-            sl: slPrice,
-            tp: tpPrice
-        };
-
-        saveUserPersistedData(uid);
-        renderActiveHolding();
-
-    } catch (err) {
-        showStylishPopup(err.message || 'Exchange Error: Failed to communicate with server.', 'error');
-        fmaBotActive = false;
-    }
+    saveCurrentModeData(uid);
+    renderActiveHoldingsTable();
+    showStylishPopup(`Simultaneous Bot successfully launched for ${currentSymbol}!`, 'success');
 };
 
 window.stopBot = async function() {
-    fmaBotActive = false;
-    try {
-        await fetch('/api/gate/close-all', { method: 'POST' });
-    } catch(e) {}
-
-    let holdingTbody = document.getElementById('active-holding-tbody');
-    if (holdingTbody && !activeTradeData) {
-        holdingTbody.innerHTML = `<tr><td colspan="5" style="padding: 12px; text-align: center; color: #8b949e;">Bot stopped. No active holdings.</td></tr>`;
-    }
-    let terminal = document.getElementById('terminal-logs');
-    if (terminal) {
-        terminal.innerHTML += `<br><span style="color:#f85149; font-weight:bold;">[SYSTEM]</span> FMA Live Bot stopped by user.`;
-        terminal.scrollTop = terminal.scrollHeight;
-    }
-    showStylishPopup('Bot stopped successfully.', 'success');
+    activeTradesMap = {};
+    let uid = localStorage.getItem('crypto_user_uid');
+    saveCurrentModeData(uid);
+    renderActiveHoldingsTable();
+    showStylishPopup('All active simultaneous bots stopped.', 'success');
 };
 
 window.clearLogs = function() {
@@ -676,8 +477,6 @@ window.clearLogs = function() {
 };
 
 window.selectPlan = function(planName, price) {
-    let passcodeIn = document.getElementById('passcode-input');
-    if (passcodeIn) passcodeIn.focus();
     alert(`Selected ${planName} ($${price}). Contact admin via WhatsApp to get your passcode.`);
 };
 
@@ -711,28 +510,23 @@ window.adminLogin = function() {
 
 window.editUserBalance = function() {
     let uid = localStorage.getItem('crypto_user_uid');
-    let newBal = prompt('Enter new total wallet balance for user:', '500');
+    let newBal = prompt(`Enter new total ${tradingMode} balance:`, '500');
     if (newBal !== null) {
         let val = parseFloat(newBal) || 0;
         updateBalanceDisplay(val, true);
-        showStylishPopup(`User balance instantly updated to $${val.toFixed(2)}!`, 'success');
+        showStylishPopup(`${tradingMode} balance instantly updated to $${val.toFixed(2)}!`, 'success');
     }
-};
-
-window.pauseAllBots = function() {
-    fmaBotActive = false;
-    showStylishPopup('Global System Emergency Switch Activated! All trading bots paused.', 'error');
 };
 
 window.addNewTradingPair = function() {
     let pairInput = document.getElementById('admin-new-pair');
     let pair = pairInput ? pairInput.value.trim().toUpperCase() : '';
     if (!pair) {
-        alert('Please enter a valid trading pair (e.g. MOODENGUSDT)');
+        alert('Please enter a valid pair symbol');
         return;
     }
     spotCoins.push({ symbol: pair, name: pair });
-    showStylishPopup(`New spot trading pair ${pair} added successfully!`, 'success');
+    showStylishPopup(`New trading pair ${pair} added!`, 'success');
     pairInput.value = '';
 };
 
@@ -740,26 +534,19 @@ window.submitDeposit = function() {
     let uid = localStorage.getItem('crypto_user_uid');
     let txInput = document.getElementById('tx-hash-input');
     let amountInput = document.getElementById('deposit-amount');
-
     let details = txInput ? txInput.value : '';
     let amount = parseFloat(amountInput ? amountInput.value : 0) || 0;
 
     if (!details || amount <= 0) {
-        alert('Please fill out valid deposit amount and reference ID.');
+        alert('Please provide valid deposit details.');
         return;
     }
 
     let pendingList = JSON.parse(localStorage.getItem('admin_pending_requests') || '[]');
-    pendingList.push({
-        id: Date.now(),
-        uid: uid,
-        type: 'DEPOSIT',
-        amount: amount,
-        details: details
-    });
+    pendingList.push({ id: Date.now(), uid: uid, type: 'DEPOSIT', amount: amount, details: details });
     localStorage.setItem('admin_pending_requests', JSON.stringify(pendingList));
 
-    showStylishPopup('Deposit proof submitted successfully to admin financials!', 'success');
+    showStylishPopup('Deposit proof submitted to admin financials!', 'success');
     txInput.value = '';
     amountInput.value = '';
     renderAdminFinancials();
@@ -768,7 +555,6 @@ window.submitDeposit = function() {
 function renderAdminFinancials() {
     let tbody = document.getElementById('admin-financials-tbody');
     if (!tbody) return;
-
     let pendingList = JSON.parse(localStorage.getItem('admin_pending_requests') || '[]');
     if (pendingList.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" style="padding: 12px; text-align: center; color: #8b949e;">No pending requests.</td></tr>`;
@@ -778,14 +564,12 @@ function renderAdminFinancials() {
     tbody.innerHTML = '';
     pendingList.forEach((req) => {
         let tr = document.createElement('tr');
-        tr.style.borderBottom = '1px solid #30363d';
         tr.innerHTML = `
             <td style="padding: 8px;">${req.type}<br><span style="font-size:10px; color:#8b949e;">${req.uid}</span></td>
             <td style="padding: 8px; color:#3fb950; font-weight:bold;">$${req.amount}</td>
-            <td style="padding: 8px; font-size:11px; color:#c9d1d9;">${req.details}</td>
+            <td style="padding: 8px; font-size:11px;">${req.details}</td>
             <td style="padding: 8px;">
-                <button onclick="resolveRequest(${req.id}, 'ACCEPT')" style="background: #238636; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; margin-right: 4px; font-weight:bold;">Accept ✓</button>
-                <button onclick="resolveRequest(${req.id}, 'REJECT')" style="background: #da3633; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight:bold;">Reject ✕</button>
+                <button onclick="resolveRequest(${req.id}, 'ACCEPT')" style="background: #238636; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight:bold;">Accept ✓</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -796,20 +580,95 @@ window.resolveRequest = function(id, action) {
     let pendingList = JSON.parse(localStorage.getItem('admin_pending_requests') || '[]');
     let index = pendingList.findIndex(r => r.id === id);
     if (index === -1) return;
-
     let req = pendingList[index];
     pendingList.splice(index, 1);
     localStorage.setItem('admin_pending_requests', JSON.stringify(pendingList));
 
     if (action === 'ACCEPT') {
         let uid = req.uid;
-        let currentBal = parseFloat(localStorage.getItem(`crypto_balance_${uid}`)) || 500;
+        let balanceKey = `crypto_balance_REAL_${uid}`;
+        let currentBal = parseFloat(localStorage.getItem(balanceKey)) || 500;
         let newBal = currentBal + req.amount;
-        updateBalanceDisplay(newBal, true);
-        showStylishPopup(`Deposit request accepted! User balance updated instantly to $${newBal.toFixed(2)}.`, 'success');
-    } else {
-        showStylishPopup('Deposit request rejected.', 'error');
+        localStorage.setItem(balanceKey, newBal.toFixed(2));
+        if (tradingMode === 'REAL') updateBalanceDisplay(newBal, false);
+        showStylishPopup(`Deposit accepted! REAL balance updated to $${newBal.toFixed(2)}.`, 'success');
     }
-
     renderAdminFinancials();
 };
+
+window.openShareModal = function(symbol, pnl, capital) {
+    let existingModal = document.getElementById('share-card-modal');
+    if (existingModal) existingModal.remove();
+
+    let modal = document.createElement('div');
+    modal.id = 'share-card-modal';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.background = 'rgba(0,0,0,0.8)';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    modal.style.zIndex = '999999';
+
+    modal.innerHTML = `
+        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; width: 320px; color: #fff; text-align: center;">
+            <h3 style="margin-bottom: 15px; color: #58a6ff;">🚀 Share Trade Result</h3>
+            <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: left;">
+                <p style="margin: 5px 0;"><strong>Pair:</strong> ${symbol}</p>
+                <p style="margin: 5px 0;"><strong>PnL:</strong> <span style="color: ${pnl.includes('+') ? '#3fb950' : '#f85149'};">${pnl}</span></p>
+                <p style="margin: 5px 0;"><strong>Capital:</strong> ${capital}</p>
+            </div>
+            <button onclick="navigator.clipboard.writeText('🚀 My Trade Result: ${symbol} PnL: ${pnl}'); showStylishPopup('Copied to clipboard!', 'success'); document.getElementById('share-card-modal').remove();" style="background: #238636; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 8px;">📋 Copy Share Text</button>
+            <button onclick="document.getElementById('share-card-modal').remove()" style="background: #da3633; color: #fff; border: none; padding: 6px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%;">Close</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.switchTab = function(tabName) {
+    document.querySelectorAll('.tab-section').forEach(section => {
+        section.classList.add('hidden');
+        section.classList.remove('active');
+    });
+    const targetSection = document.getElementById(`tab-${tabName}`);
+    if (targetSection) {
+        targetSection.classList.remove('hidden');
+        targetSection.classList.add('active');
+    }
+};
+
+window.showCoinDropdown = function() { renderCoinList(spotCoins); };
+window.filterCoins = function() {
+    let searchInput = document.getElementById('coin-search');
+    if (!searchInput) return;
+    let query = searchInput.value.toUpperCase();
+    let filtered = spotCoins.filter(c => c.symbol.includes(query) || c.name.toUpperCase().includes(query));
+    renderCoinList(filtered);
+};
+
+function renderCoinList(coins) {
+    let dropdown = document.getElementById('coin-dropdown');
+    if (!dropdown) return;
+    dropdown.innerHTML = '';
+    if (coins.length === 0) { dropdown.classList.add('hidden'); return; }
+    dropdown.classList.remove('hidden');
+    coins.forEach(coin => {
+        let item = document.createElement('div');
+        item.style.padding = '8px 12px';
+        item.style.cursor = 'pointer';
+        item.style.borderBottom = '1px solid #30363d';
+        item.innerHTML = `<strong>${coin.symbol}</strong> <span style="color:#8b949e;">${coin.name}</span>`;
+        item.onclick = function() {
+            currentSymbol = coin.symbol;
+            let searchInput = document.getElementById('coin-search');
+            if (searchInput) searchInput.value = coin.symbol;
+            dropdown.classList.add('hidden');
+            loadTradingViewChart(currentSymbol);
+            fetchLiveCoinPrice(currentSymbol);
+        };
+        dropdown.appendChild(item);
+    });
+}
