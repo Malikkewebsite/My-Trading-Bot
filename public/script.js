@@ -193,10 +193,9 @@ function updateActiveTradePnL(currentPrice) {
     
     let priceDiffRatio = (currentPrice - entryPrice) / entryPrice;
     let pnl = allocatedCapital * priceDiffRatio * 5; 
-    let percent = priceDiffRatio * 100 * 5;
 
     let pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
-    let pnlText = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%)`;
+    let pnlText = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
 
     let decimals = entryPrice < 1 ? 6 : 2;
     let holdingTbody = document.getElementById('active-holding-tbody');
@@ -420,7 +419,6 @@ window.startBot = async function() {
         return;
     }
 
-    // Format current pair for Gate.io API style (e.g. BTC_USDT)
     let gateSymbol = currentSymbol.replace('USDT', '_USDT');
 
     const terminal = document.getElementById('terminal-logs');
