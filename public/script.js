@@ -1,3 +1,5 @@
+// --- COMPLETE COMBINED CODE: PART 1, PART 2 & PART 3 ---
+
 const spotCoins = [
     { symbol: 'BTCUSDT', name: 'Bitcoin' },
     { symbol: 'ETHUSDT', name: 'Ethereum' },
@@ -72,14 +74,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
 });
 
-// Feature: 100% Isolated Real / Demo Trading Mode Switcher
+// --- PART 1 FEATURES: MODE SWITCHER & TRADING LOGIC ---
 window.switchTradingMode = function(mode) {
     if (mode !== 'REAL' && mode !== 'DEMO') return;
     tradingMode = mode;
     
     let uid = localStorage.getItem('crypto_user_uid');
     
-    // Update Mode UI Buttons active state
     let realBtn = document.getElementById('mode-btn-real');
     let demoBtn = document.getElementById('mode-btn-demo');
     if (realBtn && demoBtn) {
@@ -101,7 +102,6 @@ function loadCurrentModeData(uid) {
     let currentBal = parseFloat(localStorage.getItem(balanceKey)) || (tradingMode === 'REAL' ? 500.00 : 10000.00);
     updateBalanceDisplay(currentBal, false);
 
-    // Load isolated active trades for this mode
     let savedHoldings = localStorage.getItem(`active_holdings_${tradingMode}_${uid}`);
     if (savedHoldings) {
         try {
@@ -113,7 +113,6 @@ function loadCurrentModeData(uid) {
         activeTradesMap = {};
     }
 
-    // Load isolated signals for this mode
     let savedSignals = localStorage.getItem(`trade_signals_${tradingMode}_${uid}`);
     let tbody = document.getElementById('trade-signals-tbody');
     if (tbody) {
@@ -145,7 +144,7 @@ function updateBalanceDisplay(newBalance, saveToStorage = true) {
     if (adminTableBal) adminTableBal.innerText = `$${newBalance.toFixed(2)}`;
 }
 
-// Feature: Dark & Light Mode Toggle
+// --- PART 2 FEATURES: THEMES, DUAL CURRENCY, MULTI-TIMEFRAME & RRR ---
 window.toggleThemeMode = function() {
     currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
     applyThemeStyles();
@@ -173,7 +172,6 @@ function applyThemeStyles() {
     }
 }
 
-// Feature: Dual Currency Balance Display (USD <-> BTC Toggle)
 window.toggleCurrencyView = function() {
     currencyView = currencyView === 'USD' ? 'BTC' : 'USD';
     let uid = localStorage.getItem('crypto_user_uid');
@@ -196,7 +194,6 @@ function updateDualCurrencyDisplay(usdBalance) {
     }
 }
 
-// Feature: Multi-Timeframe Price Change Fetcher
 async function fetchMultiTimeframeData(symbol) {
     try {
         let res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`);
@@ -223,7 +220,6 @@ async function fetchMultiTimeframeData(symbol) {
     } catch(e) {}
 }
 
-// Feature: Risk-to-Reward Ratio (RRR) Visualizer
 window.calculateAndVisualizeRRR = function() {
     let entryInput = parseFloat(document.getElementById('rrr-entry')?.value) || parseFloat(document.getElementById('coin-price')?.innerText.replace('$', '')) || 60000;
     let slInput = parseFloat(document.getElementById('rrr-sl')?.value) || (entryInput * 0.985);
@@ -244,7 +240,97 @@ window.calculateAndVisualizeRRR = function() {
     }
 };
 
-// Feature: Collapsible Mobile Sidebar Drawer (with all website sections)
+// --- PART 3 FEATURES: ADVANCED FILTERS, PUSH NOTIFICATIONS & VOICE ---
+window.filterTradeSignals = function(filterType) {
+    let tbody = document.getElementById('trade-signals-tbody');
+    if (!tbody) return;
+    
+    let rows = tbody.getElementsByTagName('tr');
+    for (let i = 0; i < rows.length; i++) {
+        let row = rows[i];
+        if (row.innerText.includes('No trade signals yet')) continue;
+        
+        let pnlText = row.innerHTML;
+        let isProfit = pnlText.includes('+') || (pnlText.includes('$') && !pnlText.includes('-$') && !pnlText.includes('$-'));
+        
+        if (filterType === 'ALL') {
+            row.style.display = '';
+        } else if (filterType === 'PROFIT' && isProfit) {
+            row.style.display = '';
+        } else if (filterType === 'LOSS' && !isProfit) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    }
+    showStylishPopup(`Trade signals filtered by: ${filterType}`, 'success');
+};
+
+window.requestPushPermission = async function() {
+    if (!('Notification' in window)) {
+        alert('This browser does not support desktop push notifications.');
+        return;
+    }
+    let permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+        showStylishPopup('Push notifications enabled successfully!', 'success');
+    } else {
+        showStylishPopup('Push notification permission denied.', 'error');
+    }
+};
+
+window.setCustomPriceAlert = function() {
+    let targetPriceInput = document.getElementById('alert-price-input');
+    let targetPrice = parseFloat(targetPriceInput ? targetPriceInput.value : 0) || 0;
+    
+    if (targetPrice <= 0) {
+        alert('Please enter a valid target price for the alert.');
+        return;
+    }
+
+    showStylishPopup(`Alert set for ${currentSymbol} at $${targetPrice}. We will notify you even in background!`, 'success');
+    
+    let alertInterval = setInterval(async () => {
+        try {
+            let res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${currentSymbol}`);
+            let data = await res.json();
+            let currentLivePrice = parseFloat(data.price);
+            
+            if (currentLivePrice >= targetPrice) {
+                triggerBackgroundNotification(`🚨 Price Alert Hit!`, `${currentSymbol} reached your target price of $${targetPrice} (Current: $${currentLivePrice})`);
+                playVoiceAnnouncement(`Attention! ${currentSymbol} has reached your target price.`);
+                clearInterval(alertInterval);
+            }
+        } catch(e) {}
+    }, 5000);
+};
+
+function triggerBackgroundNotification(title, bodyText) {
+    if (Notification.permission === 'granted') {
+        try {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, {
+                    body: bodyText,
+                    icon: 'https://cryptologos.cc/logos/bitcoin-btc-logo.png'
+                });
+            });
+        } catch(e) {
+            new Notification(title, { body: bodyText });
+        }
+    }
+    showStylishPopup(`${title}: ${bodyText}`, 'success');
+}
+
+window.playVoiceAnnouncement = function(textMessage) {
+    if ('speechSynthesis' in window) {
+        let utterance = new SpeechSynthesisUtterance(textMessage);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+    }
+};
+
+// --- GENERAL UI & DRAWER FUNCTIONS ---
 function renderMobileSidebarDrawer() {
     let body = document.body;
     if (document.getElementById('mobile-sidebar-drawer')) return;
@@ -507,6 +593,7 @@ window.closeSpecificHolding = async function(symbol) {
     renderActiveHoldingsTable();
 
     showStylishPopup(`Position closed for ${symbol}. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`, 'success');
+    playVoiceAnnouncement(`Trade closed successfully. Profit and loss updated.`);
 };
 
 window.startBot = async function() {
@@ -554,7 +641,7 @@ window.startBot = async function() {
         symbol: currentSymbol,
         entryPrice: currentPrice,
         currentPrice: currentPrice,
-            capital: capital
+        capital: capital
     };
 
     saveCurrentModeData(uid);
