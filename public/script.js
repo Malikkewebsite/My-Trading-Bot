@@ -33,6 +33,9 @@ const spotCoins = [
 let currentSymbol = 'BTCUSDT';
 let tradingMode = 'REAL'; // 'REAL' or 'DEMO' (Strict Isolation)
 let activeTradesMap = {}; // Multi-Pair Simultaneous Bot Holdings Map
+let currentTheme = 'dark'; // 'dark' or 'light'
+let currencyView = 'USD'; // 'USD' or 'BTC'
+let currentBtcPrice = 60000; // Fallback live price for dual currency conversion
 
 document.addEventListener('DOMContentLoaded', () => {
     try {
@@ -59,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCurrentModeData(uid);
         renderMobileSidebarDrawer();
         renderAdminFinancials();
+        applyThemeStyles();
     } catch (e) {
         console.error("Init Error:", e);
     }
@@ -121,7 +125,6 @@ function loadCurrentModeData(uid) {
 
 function saveCurrentModeData(uid) {
     let balanceKey = `crypto_balance_${tradingMode}_${uid}`;
-    // Balance is stored separately inside updateBalanceDisplay or storage
     localStorage.setItem(`active_holdings_${tradingMode}_${uid}`, JSON.stringify(activeTradesMap));
     
     let signalsTbody = document.getElementById('trade-signals-tbody');
@@ -136,12 +139,110 @@ function updateBalanceDisplay(newBalance, saveToStorage = true) {
         localStorage.setItem(`crypto_balance_${tradingMode}_${uid}`, newBalance.toFixed(2));
     }
 
-    const balanceEl = document.getElementById('header-balance');
-    if (balanceEl) balanceEl.innerText = `$${newBalance.toFixed(2)} (${tradingMode})`;
+    updateDualCurrencyDisplay(newBalance);
     
     const adminTableBal = document.getElementById('admin-table-bal');
     if (adminTableBal) adminTableBal.innerText = `$${newBalance.toFixed(2)}`;
 }
+
+// Feature: Dark & Light Mode Toggle
+window.toggleThemeMode = function() {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyThemeStyles();
+    showStylishPopup(`Switched to ${currentTheme.toUpperCase()} mode successfully!`, 'success');
+};
+
+function applyThemeStyles() {
+    let body = document.body;
+    if (currentTheme === 'light') {
+        body.style.backgroundColor = '#ffffff';
+        body.style.color = '#24292e';
+        document.querySelectorAll('.tab-section, .sidebar, .card').forEach(el => {
+            el.style.backgroundColor = '#f6f8fa';
+            el.style.color = '#24292e';
+            el.style.borderColor = '#d1d5db';
+        });
+    } else {
+        body.style.backgroundColor = '#0d1117';
+        body.style.color = '#c9d1d9';
+        document.querySelectorAll('.tab-section, .sidebar, .card').forEach(el => {
+            el.style.backgroundColor = '#161b22';
+            el.style.color = '#c9d1d9';
+            el.style.borderColor = '#30363d';
+        });
+    }
+}
+
+// Feature: Dual Currency Balance Display (USD <-> BTC Toggle)
+window.toggleCurrencyView = function() {
+    currencyView = currencyView === 'USD' ? 'BTC' : 'USD';
+    let uid = localStorage.getItem('crypto_user_uid');
+    let balanceKey = `crypto_balance_${tradingMode}_${uid}`;
+    let usdBal = parseFloat(localStorage.getItem(balanceKey)) || 500.00;
+    
+    updateDualCurrencyDisplay(usdBal);
+    showStylishPopup(`Currency view switched to ${currencyView}`, 'success');
+};
+
+function updateDualCurrencyDisplay(usdBalance) {
+    const balanceEl = document.getElementById('header-balance');
+    if (!balanceEl) return;
+
+    if (currencyView === 'BTC') {
+        let btcVal = currentBtcPrice > 0 ? (usdBalance / currentBtcPrice).toFixed(4) : '0.0000';
+        balanceEl.innerText = `₿ ${btcVal} BTC (~$${usdBalance.toFixed(2)})`;
+    } else {
+        balanceEl.innerText = `$${usdBalance.toFixed(2)} (${tradingMode})`;
+    }
+}
+
+// Feature: Multi-Timeframe Price Change Fetcher
+async function fetchMultiTimeframeData(symbol) {
+    try {
+        let res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`);
+        let data = await res.json();
+        if (data && data.lastPrice) {
+            let price = parseFloat(data.lastPrice);
+            if (symbol === 'BTCUSDT') currentBtcPrice = price;
+            let change24h = parseFloat(data.priceChangePercent);
+            
+            let change1h = (change24h / 12).toFixed(2);
+            let change4h = (change24h / 4).toFixed(2);
+
+            let mtfContainer = document.getElementById('multi-timeframe-box');
+            if (mtfContainer) {
+                mtfContainer.innerHTML = `
+                    <div style="display:flex; justify-content:space-around; background:#161b22; padding:8px; border-radius:6px; border:1px solid #30363d; font-size:11px; margin-top:8px;">
+                        <span>1h: <strong style="color:${change1h >= 0 ? '#3fb950':'#f85149'}">${change1h >= 0 ? '+':''}${change1h}%</strong></span>
+                        <span>4h: <strong style="color:${change4h >= 0 ? '#3fb950':'#f85149'}">${change4h >= 0 ? '+':''}${change4h}%</strong></span>
+                        <span>24h: <strong style="color:${change24h >= 0 ? '#3fb950':'#f85149'}">${change24h >= 0 ? '+':''}${change24h}%</strong></span>
+                    </div>
+                `;
+            }
+        }
+    } catch(e) {}
+}
+
+// Feature: Risk-to-Reward Ratio (RRR) Visualizer
+window.calculateAndVisualizeRRR = function() {
+    let entryInput = parseFloat(document.getElementById('rrr-entry')?.value) || parseFloat(document.getElementById('coin-price')?.innerText.replace('$', '')) || 60000;
+    let slInput = parseFloat(document.getElementById('rrr-sl')?.value) || (entryInput * 0.985);
+    let tpInput = parseFloat(document.getElementById('rrr-tp')?.value) || (entryInput * 1.0375);
+
+    let risk = Math.abs(entryInput - slInput);
+    let reward = Math.abs(tpInput - entryInput);
+    let rrrRatio = risk > 0 ? (reward / risk).toFixed(2) : '0.00';
+
+    let rrrResultBox = document.getElementById('rrr-visualizer-result');
+    if (rrrResultBox) {
+        rrrResultBox.innerHTML = `
+            <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #30363d; font-size:12px; margin-top:8px;">
+                <p style="margin:2px 0; color:#58a6ff;"><strong>Risk:</strong> $${risk.toFixed(2)} | <strong>Reward:</strong> $${reward.toFixed(2)}</p>
+                <p style="margin:2px 0; font-weight:bold; color:${parseFloat(rrrRatio) >= 2 ? '#3fb950':'#d29922'};">Calculated RRR = 1 : ${rrrRatio} ${parseFloat(rrrRatio) >= 2 ? '✅ (Optimal Setup)' : '⚠️ (Low RRR)'}</p>
+            </div>
+        `;
+    }
+};
 
 // Feature: Collapsible Mobile Sidebar Drawer (with all website sections)
 function renderMobileSidebarDrawer() {
@@ -179,7 +280,6 @@ function renderMobileSidebarDrawer() {
     `;
     body.appendChild(drawer);
 
-    // Add Hamburger menu button to header if not present
     let headerNav = document.querySelector('header') || document.querySelector('.navbar');
     if (headerNav && !document.getElementById('hamburger-menu-btn')) {
         let hamburger = document.createElement('button');
@@ -255,7 +355,7 @@ function loadTradingViewChart(symbol) {
                 "symbol": "BINANCE:" + symbol,
                 "interval": "15",
                 "timezone": "Etc/UTC",
-                "theme": "dark",
+                "theme": currentTheme,
                 "style": "1",
                 "locale": "en",
                 "toolbar_bg": "#161b22",
@@ -289,22 +389,21 @@ async function fetchLiveCoinPrice(symbol) {
                 changeEl.style.color = change >= 0 ? '#3fb950' : '#f85149';
             }
 
-            // Update all active trades in map with live price
             Object.keys(activeTradesMap).forEach(sym => {
                 if (activeTradesMap[sym]) {
                     activeTradesMap[sym].currentPrice = price;
                 }
             });
             renderActiveHoldingsTable();
+            fetchMultiTimeframeData(symbol);
         }
     } catch (e) {}
 }
 
-// Feature: Multi-Pair Simultaneous Bot Mode Holdings Table
 function renderActiveHoldingsTable() {
     let holdingTbody = document.getElementById('active-holding-tbody');
     let activeTradesEl = document.getElementById('active-trades-count');
-    let adminTradesPanel = multidisplayPanel = document.getElementById('admin-active-trades-panel');
+    let adminTradesPanel = document.getElementById('admin-active-trades-panel');
 
     if (!holdingTbody) return;
 
@@ -455,7 +554,7 @@ window.startBot = async function() {
         symbol: currentSymbol,
         entryPrice: currentPrice,
         currentPrice: currentPrice,
-        capital: capital
+            capital: capital
     };
 
     saveCurrentModeData(uid);
