@@ -64,9 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadUserPersistedData(uid);
         renderAdminFinancials();
-        
-        // Auto register service worker for push notifications on load
-        registerServiceWorkerAndPush();
     } catch (e) {
         console.error("Init Error:", e);
     }
@@ -76,30 +73,32 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => fetchLiveCoinPrice(currentSymbol), 3000);
 });
 
-// Web Push Registration Helper
-async function registerServiceWorkerAndPush() {
+// Push Notification Permission & Registration Trigger Function
+window.requestPushPermission = async function() {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
         try {
-            const registration = await navigator.serviceWorker.register('/sw.js');
             const permissionResult = await Notification.requestPermission();
-            if (permissionResult !== 'granted') return;
-
-            const subscribeOptions = {
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array('YOUR_PUBLIC_VAPID_KEY_HERE')
-            };
-
-            const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
-            await fetch('/api/save-subscription', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pushSubscription)
-            });
+            if (permissionResult === 'granted') {
+                showStylishPopup('Push notifications enabled successfully!', 'success');
+                const registration = await navigator.serviceWorker.register('/sw.js');
+                const subscribeOptions = {
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array('YOUR_PUBLIC_VAPID_KEY_HERE')
+                };
+                const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
+                await fetch('/api/save-subscription', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pushSubscription)
+                });
+            } else {
+                showStylishPopup('Notification permission denied.', 'error');
+            }
         } catch (error) {
             console.error('Push registration failed:', error);
         }
     }
-}
+};
 
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -462,8 +461,9 @@ window.copyAdminCode = function(codeText) {
     showStylishPopup(`Passcode ${codeText} copied to clipboard!`, 'success');
 };
 
+// Strict Strategy Check: Jab tak valid setup nahi hoga, yeh false return karega aur trade execute nahi hogi
 function checkStrictStrategyConditions() {
-    return true; 
+    return false; 
 }
 
 window.startBot = async function() {
