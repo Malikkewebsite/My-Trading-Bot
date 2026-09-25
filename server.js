@@ -6,27 +6,34 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// In-memory storage for active broadcast trades (can be replaced with database later)
-let broadcastTrades = [];
+let broadcastSignals = [];
 
-app.get('/api/trades', (req, res) => {
-    res.json(broadcastTrades);
+app.get('/api/signals', (req, res) => {
+    res.json(broadcastSignals);
 });
 
-app.post('/api/trades', (req, res) => {
-    const trade = {
+app.post('/api/signals', (req, res) => {
+    const { password, symbol, type, entry, target, stopLoss } = req.body;
+
+    // Check Admin Password
+    if (password !== 'MalikSabSignals') {
+        return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
+    }
+
+    const signal = {
         id: Date.now(),
-        symbol: req.body.symbol,
-        type: req.body.type, // LONG / SHORT
-        entry: req.body.entry,
-        target: req.body.target,
-        stopLoss: req.body.stopLoss,
-        timestamp: new Date().toLocaleTimeString()
+        symbol: symbol.toUpperCase(),
+        type,
+        entry,
+        target,
+        stopLoss,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
-    broadcastTrades.unshift(trade);
-    res.json({ success: true, trade });
+
+    broadcastSignals.unshift(signal);
+    res.json({ success: true, signal });
 });
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
