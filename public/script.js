@@ -1,4 +1,4 @@
-// Initialize Supabase client for frontend real-time updates
+// Initialize Supabase client
 const SUPABASE_URL = 'https://sbrtwcchusogvsopnjes.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_H0JP00q2U-oU0kMxTGOrbQ_HlKREikF';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -14,19 +14,11 @@ const adminPasswordInput = document.getElementById('adminPasswordInput');
 const broadcastForm = document.getElementById('broadcastForm');
 const signalsGrid = document.getElementById('signalsGrid');
 
-// Modal Toggles with smooth animation
-openAdminBtn.addEventListener('click', () => {
-    adminModal.classList.add('active');
-});
-
-closeModalBtn.addEventListener('click', () => {
-    adminModal.classList.remove('active');
-});
-
+// Modal Toggles
+openAdminBtn.addEventListener('click', () => adminModal.classList.add('active'));
+closeModalBtn.addEventListener('click', () => adminModal.classList.remove('active'));
 adminModal.addEventListener('click', (e) => {
-    if (e.target === adminModal) {
-        adminModal.classList.remove('active');
-    }
+    if (e.target === adminModal) adminModal.classList.remove('active');
 });
 
 // Admin Password Authentication Check
@@ -41,12 +33,11 @@ loginBtn.addEventListener('click', () => {
     }
 });
 
-// Handle Broadcast Form Submission
+// Handle Broadcast Form Submission (Direct to Supabase)
 broadcastForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const password = adminPasswordInput.value.trim();
-    const symbol = document.getElementById('symbolInput').value.trim();
+    const symbol = document.getElementById('symbolInput').value.trim().toUpperCase();
     const trade_type = document.getElementById('tradeTypeInput').value;
     const order_type = document.getElementById('orderTypeInput').value;
     const entry_price = document.getElementById('entryInput').value.trim();
@@ -58,24 +49,20 @@ broadcastForm.addEventListener('submit', async (e) => {
     broadcastBtn.disabled = true;
 
     try {
-        const response = await fetch('/api/broadcast', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password, symbol, trade_type, order_type, entry_price, target_price, stop_loss })
-        });
+        const { data, error } = await supabaseClient
+            .from('signals')
+            .insert([{ symbol, trade_type, order_type, entry_price, target_price, stop_loss }]);
 
-        const result = await response.json();
-
-        if (result.success) {
-            alert('Signal Broadcasted Successfully & Live Push Triggered!');
-            broadcastForm.reset();
-            adminModal.classList.remove('active');
-        } else {
-            alert('Error: ' + (result.error || 'Failed to broadcast signal'));
+        if (error) {
+            throw error;
         }
+
+        alert('Signal Broadcasted Successfully & Live Push Triggered!');
+        broadcastForm.reset();
+        adminModal.classList.remove('active');
     } catch (err) {
         console.error(err);
-        alert('Network error while broadcasting signal.');
+        alert('Error broadcasting signal: ' + err.message);
     } finally {
         broadcastBtn.textContent = 'Broadcast Signal';
         broadcastBtn.disabled = false;
@@ -143,13 +130,13 @@ function renderSignals(signals) {
     });
 }
 
-// Real-Time Supabase Listener for Instant Push Notifications across clients
+// Real-Time Supabase Listener
 function setupRealtimeListener() {
     supabaseClient
         .channel('public:signals')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'signals' }, payload => {
             console.log('New real-time signal received:', payload.new);
-            fetchSignals(); // Refresh feed instantly
+            fetchSignals();
         })
         .subscribe();
 }
