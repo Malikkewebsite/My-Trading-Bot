@@ -1,99 +1,159 @@
-document.addEventListener('DOMContentLoaded', () => {
-    fetchSignals();
-    setInterval(fetchSignals, 4000); // Poll every 4 seconds
+// Initialize Supabase client for frontend real-time updates
+const SUPABASE_URL = 'https://sbrtwcchusogvsopnjes.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_H0JP00q2U-oU0kMxTGOrbQ_HlKREikF';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// DOM Elements
+const openAdminBtn = document.getElementById('openAdminBtn');
+const closeModalBtn = document.getElementById('closeModalBtn');
+const adminModal = document.getElementById('adminModal');
+const loginSection = document.getElementById('loginSection');
+const broadcastSection = document.getElementById('broadcastSection');
+const loginBtn = document.getElementById('loginBtn');
+const adminPasswordInput = document.getElementById('adminPasswordInput');
+const broadcastForm = document.getElementById('broadcastForm');
+const signalsGrid = document.getElementById('signalsGrid');
+
+// Modal Toggles with smooth animation
+openAdminBtn.addEventListener('click', () => {
+    adminModal.classList.add('active');
 });
 
-async function requestNotificationPermission() {
-    if (!('Notification' in window)) {
-        alert('This browser does not support desktop notifications.');
-        return;
+closeModalBtn.addEventListener('click', () => {
+    adminModal.classList.remove('active');
+});
+
+adminModal.addEventListener('click', (e) => {
+    if (e.target === adminModal) {
+        adminModal.classList.remove('active');
     }
-    let permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-        alert('Notifications enabled successfully!');
+});
+
+// Admin Password Authentication Check
+loginBtn.addEventListener('click', () => {
+    const password = adminPasswordInput.value.trim();
+    if (password === 'MalikKaBot') {
+        loginSection.style.display = 'none';
+        broadcastSection.style.display = 'flex';
     } else {
-        alert('Permission denied for notifications.');
+        alert('Invalid Admin Password!');
+        adminPasswordInput.value = '';
     }
-}
+});
 
-async function broadcastSignal() {
-    const password = document.getElementById('admin-pass').value;
-    const symbol = document.getElementById('trade-symbol').value.toUpperCase();
-    const type = document.getElementById('trade-type').value;
-    const entry = document.getElementById('trade-entry').value;
-    const target = document.getElementById('trade-target').value;
-    const stopLoss = document.getElementById('trade-sl').value;
+// Handle Broadcast Form Submission
+broadcastForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-    if (!password || !symbol || !entry) {
-        alert('Please fill in password, symbol, and entry price.');
-        return;
-    }
+    const password = adminPasswordInput.value.trim();
+    const symbol = document.getElementById('symbolInput').value.trim();
+    const trade_type = document.getElementById('tradeTypeInput').value;
+    const order_type = document.getElementById('orderTypeInput').value;
+    const entry_price = document.getElementById('entryInput').value.trim();
+    const target_price = document.getElementById('targetInput').value.trim();
+    const stop_loss = document.getElementById('stopLossInput').value.trim();
+
+    const broadcastBtn = document.getElementById('broadcastBtn');
+    broadcastBtn.textContent = 'Broadcasting Signal...';
+    broadcastBtn.disabled = true;
 
     try {
-        let res = await fetch('/api/signals', {
+        const response = await fetch('/api/broadcast', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password, symbol, type, entry, target, stopLoss })
+            body: JSON.stringify({ password, symbol, trade_type, order_type, entry_price, target_price, stop_loss })
         });
-        let data = await res.json();
-        
-        if (data.success) {
-            alert('Signal broadcasted successfully!');
-            // Clear inputs (keep password)
-            document.getElementById('trade-symbol').value = '';
-            document.getElementById('trade-entry').value = '';
-            document.getElementById('trade-target').value = '';
-            document.getElementById('trade-sl').value = '';
-            fetchSignals();
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert('Signal Broadcasted Successfully & Live Push Triggered!');
+            broadcastForm.reset();
+            adminModal.classList.remove('active');
         } else {
-            alert(data.message || 'Unauthorized / Error broadcasting!');
+            alert('Error: ' + (result.error || 'Failed to broadcast signal'));
         }
-    } catch (e) {
-        alert('Failed to connect to server.');
+    } catch (err) {
+        console.error(err);
+        alert('Network error while broadcasting signal.');
+    } finally {
+        broadcastBtn.textContent = 'Broadcast Signal';
+        broadcastBtn.disabled = false;
     }
-}
+});
 
-let lastCount = 0;
+// Fetch Initial Signals from Supabase
 async function fetchSignals() {
-    try {
-        let res = await fetch('/api/signals');
-        let signals = await res.json();
-        let tbody = document.getElementById('signals-tbody');
-        
-        if (signals.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #94a3b8;">No active signals right now.</td></tr>`;
-            return;
-        }
+    const { data, error } = await supabaseClient
+        .from('signals')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        // Trigger notification for users if a new signal arrives
-        if (signals.length > lastCount && lastCount !== 0) {
-            let latest = signals[0];
-            triggerNotification(`🚨 New Signal: ${latest.symbol}`, `${latest.type} | Entry: $${latest.entry} | Target: $${latest.target}`);
-        }
-        lastCount = signals.length;
-
-        tbody.innerHTML = '';
-        signals.forEach(s => {
-            let tr = document.createElement('tr');
-            let typeClass = s.type === 'LONG' ? 'badge-long' : 'badge-short';
-            tr.innerHTML = `
-                <td><strong>${s.symbol}</strong></td>
-                <td><span class="${typeClass}">${s.type}</span></td>
-                <td>$${s.entry}</td>
-                <td>$${s.target || '-'}</td>
-                <td>$${s.stopLoss || '-'}</td>
-                <td style="color: #64748b; font-size: 12px;">${s.timestamp}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (e) {}
-}
-
-function triggerNotification(title, body) {
-    if (Notification.permission === 'granted') {
-        new Notification(title, {
-            body: body,
-            icon: 'https://cdn-icons-png.flaticon.com/512/1216/1216733.png'
-        });
+    if (error) {
+        console.error('Error fetching signals:', error);
+        return;
     }
+
+    renderSignals(data);
 }
+
+// Render Signals to Grid
+function renderSignals(signals) {
+    if (!signals || signals.length === 0) {
+        signalsGrid.innerHTML = `<div class="empty-state">Waiting for live broadcasted signals...</div>`;
+        return;
+    }
+
+    signalsGrid.innerHTML = '';
+    signals.forEach(signal => {
+        const card = document.createElement('div');
+        card.className = 'signal-card';
+        
+        const badgeClass = signal.trade_type === 'BUY' ? 'badge-buy' : 'badge-sell';
+        const formattedDate = new Date(signal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        card.innerHTML = `
+            <div class="signal-header">
+                <span class="symbol-title">${signal.symbol}</span>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <span class="order-badge">${signal.order_type}</span>
+                    <span class="badge ${badgeClass}">${signal.trade_type}</span>
+                </div>
+            </div>
+            <div class="signal-body">
+                <div class="metric-row">
+                    <span class="metric-label">Entry Price</span>
+                    <span class="metric-value entry">${signal.entry_price}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Target (TP)</span>
+                    <span class="metric-value target">${signal.target_price}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Stop Loss (SL)</span>
+                    <span class="metric-value sl">${signal.stop_loss}</span>
+                </div>
+            </div>
+            <div class="signal-footer">
+                <span>Spot Broadcast</span>
+                <span>${formattedDate}</span>
+            </div>
+        `;
+        signalsGrid.appendChild(card);
+    });
+}
+
+// Real-Time Supabase Listener for Instant Push Notifications across clients
+function setupRealtimeListener() {
+    supabaseClient
+        .channel('public:signals')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'signals' }, payload => {
+            console.log('New real-time signal received:', payload.new);
+            fetchSignals(); // Refresh feed instantly
+        })
+        .subscribe();
+}
+
+// Initialize on page load
+fetchSignals();
+setupRealtimeListener();
