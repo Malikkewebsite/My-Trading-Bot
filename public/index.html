@@ -3,74 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Malik Crypto Signals</title>
+    <title>CryptoSignals - Live Spot Signal Broadcast</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts for High-End Financial Look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>📈 Malik Crypto Signals</h1>
-            <p>Real-time professional trading signals & alerts</p>
-        </header>
-        
-        <!-- Push Notification Banner -->
-        <div class="card" style="text-align: center;">
-            <h3 style="border: none; margin-bottom: 5px;">🔔 Live Push Notifications</h3>
-            <p style="font-size: 13px; color: #64748b; margin-top: 0;">Get instant alerts on your device when a new signal drops.</p>
-            <button class="btn-notification" onclick="requestNotificationPermission()">Enable Notifications</button>
+
+    <!-- Top Navigation Header -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <span class="brand-icon">⚡</span>
+            <h1>CRYPTO<span class="highlight">SIGNALS</span></h1>
         </div>
-
-        <!-- Admin Broadcast Panel -->
-        <div class="card" id="admin-panel">
-            <h3>🛠️ Admin Signal Broadcast Panel</h3>
-            
-            <label>Admin Password</label>
-            <input type="password" id="admin-pass" placeholder="Enter admin password">
-
-            <label>Coin Symbol</label>
-            <input type="text" id="trade-symbol" placeholder="e.g., BTCUSDT">
-
-            <label>Signal Type</label>
-            <select id="trade-type">
-                <option value="LONG">LONG (Buy)</option>
-                <option value="SHORT">SHORT (Sell)</option>
-            </select>
-
-            <label>Entry Price</label>
-            <input type="number" id="trade-entry" placeholder="e.g., 65000">
-
-            <label>Target Price</label>
-            <input type="number" id="trade-target" placeholder="e.g., 68000">
-
-            <label>Stop Loss</label>
-            <input type="number" id="trade-sl" placeholder="e.g., 64000">
-
-            <button onclick="broadcastSignal()">Broadcast Signal to Users</button>
+        <div class="nav-actions">
+            <div class="live-status">
+                <span class="pulse-dot"></span> Live Feed
+            </div>
+            <button id="openAdminBtn" class="btn-admin">Admin Portal</button>
         </div>
+    </header>
 
-        <!-- Live Signals Table -->
-        <div class="card">
-            <h3>📡 Live Signal Stream</h3>
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Pair</th>
-                            <th>Type</th>
-                            <th>Entry</th>
-                            <th>Target</th>
-                            <th>SL</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-                    <tbody id="signals-tbody">
-                        <tr><td colspan="6" style="text-align: center; color: #94a3b8;">Connecting to live stream...</td></tr>
-                    </tbody>
-                </table>
+    <!-- Main Dashboard Container -->
+    <main class="dashboard">
+        <section class="hero-section">
+            <h2>Real-Time Spot Trading Broadcasts</h2>
+            <p>Instant professional signal execution feeds configured for high-precision spot market trading.</p>
+        </section>
+
+        <!-- Signal Feed Grid -->
+        <section class="feed-container">
+            <h3>Active Broadcasted Signals</h3>
+            <div id="signalsGrid" class="signals-grid">
+                <!-- Signals will load dynamically here with smooth animations -->
+                <div class="empty-state">Waiting for live broadcasted signals...</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Admin Broadcast Modal Drawer -->
+    <div id="adminModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Admin Signal Broadcast</h3>
+                <button id="closeModalBtn" class="close-btn">&times;</button>
+            </div>
+
+            <div id="loginSection" class="auth-section">
+                <p>Enter Admin Password to Unlock Broadcasting</p>
+                <input type="password" id="adminPasswordInput" placeholder="Password (MalikKaBot)" autocomplete="current-password">
+                <button id="loginBtn" class="btn-primary">Unlock Panel</button>
+            </div>
+
+            <div id="broadcastSection" class="broadcast-form-section" style="display: none;">
+                <form id="broadcastForm">
+                    <div class="form-group">
+                        <label>Trading Symbol</label>
+                        <input type="text" id="symbolInput" placeholder="e.g. BTCUSDT" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Trade Type</label>
+                            <select id="tradeTypeInput">
+                                <option value="BUY">BUY (Long)</option>
+                                <option value="SELL">SELL (Short/Exit)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Order Type</label>
+                            <select id="orderTypeInput">
+                                <option value="Market Order">Market Order</option>
+                                <option value="Limit Order">Limit Order</option>
+                                <option value="Trailing TP/SL">Trailing TP/SL</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Entry Price</label>
+                        <input type="text" id="entryInput" placeholder="e.g. 64200.00" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Target Price (TP)</label>
+                            <input type="text" id="targetInput" placeholder="e.g. 67500.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Stop Loss (SL)</label>
+                            <input type="text" id="stopLossInput" placeholder="e.g. 63000.00" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="broadcastBtn" class="btn-primary pulse-btn">Broadcast Signal</button>
+                </form>
             </div>
         </div>
     </div>
 
+    <!-- Supabase JS Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
 </html>
