@@ -20,12 +20,13 @@ const broadcastBtn = document.getElementById('broadcastBtn');
 let isAdminLoggedIn = false;
 const PUBLIC_VAPID_KEY = 'BNty3pSq2RF9kPlfzT2VW9YY11fHAVU2d1KFZdlvFqrVlulo8eH4Wr0e1RgbMwQvQQPYemkVAiZ0wDFNhA4B2J4';
 
-// Register Service Worker on Load for Background Push Capabilities
+// Register Service Worker on Load for Background Push Capabilities with readiness check
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
             const registration = await navigator.serviceWorker.register('/sw.js');
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            await navigator.serviceWorker.ready;
         } catch (err) {
             console.error('ServiceWorker registration failed: ', err);
         }
@@ -283,7 +284,7 @@ window.deleteSignal = async function(id) {
     }
 };
 
-// Real-Time Supabase Listener for Feed UI UI updates
+// Real-Time Supabase Listener for Feed UI updates
 function setupRealtimeListener() {
     supabaseClient
         .channel('public:signals')
