@@ -20,13 +20,21 @@ const broadcastBtn = document.getElementById('broadcastBtn');
 let isAdminLoggedIn = false;
 const PUBLIC_VAPID_KEY = 'BNty3pSq2RF9kPlfzT2VW9YY11fHAVU2d1KFZdlvFqrVlulo8eH4Wr0e1RgbMwQvQQPYemkVAiZ0wDFNhA4B2J4';
 
-// Register Service Worker on Load for Background Push Capabilities with readiness check
+// Register Service Worker and check existing push subscription state on load
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
             const registration = await navigator.serviceWorker.register('/sw.js');
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
             await navigator.serviceWorker.ready;
+            
+            // Check if user is already subscribed to push notifications
+            const existingSubscription = await registration.pushManager.getSubscription();
+            if (existingSubscription) {
+                notifyBtn.textContent = "🔕 Alerts Active (Offline Ready)";
+                notifyBtn.style.background = "#10B981";
+                notifyBtn.style.color = "#FFFFFF";
+            }
         } catch (err) {
             console.error('ServiceWorker registration failed: ', err);
         }
