@@ -1,96 +1,99 @@
 document.addEventListener('DOMContentLoaded', () => {
-    fetchLiveTrades();
-    setInterval(fetchLiveTrades, 4000); // Poll every 4 seconds for real-time sync
+    fetchSignals();
+    setInterval(fetchSignals, 4000); // Poll every 4 seconds
 });
 
 async function requestNotificationPermission() {
     if (!('Notification' in window)) {
-        alert('Browser does not support notifications.');
+        alert('This browser does not support desktop notifications.');
         return;
     }
     let permission = await Notification.requestPermission();
     if (permission === 'granted') {
-        alert('Push notifications enabled successfully!');
+        alert('Notifications enabled successfully!');
     } else {
-        alert('Notification permission denied.');
+        alert('Permission denied for notifications.');
     }
 }
 
-async function executeAndBroadcastTrade() {
+async function broadcastSignal() {
+    const password = document.getElementById('admin-pass').value;
     const symbol = document.getElementById('trade-symbol').value.toUpperCase();
     const type = document.getElementById('trade-type').value;
     const entry = document.getElementById('trade-entry').value;
     const target = document.getElementById('trade-target').value;
     const stopLoss = document.getElementById('trade-sl').value;
 
-    if (!symbol || !entry) {
-        alert('Please fill out at least the symbol and entry price.');
+    if (!password || !symbol || !entry) {
+        alert('Please fill in password, symbol, and entry price.');
         return;
     }
 
-    const tradeData = { symbol, type, entry, target, stopLoss };
-
     try {
-        let res = await fetch('/api/trades', {
+        let res = await fetch('/api/signals', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(tradeData)
+            body: JSON.stringify({ password, symbol, type, entry, target, stopLoss })
         });
         let data = await res.json();
+        
         if (data.success) {
-            alert('Trade executed and broadcasted successfully!');
-            // Clear inputs
+            alert('Signal broadcasted successfully!');
+            // Clear inputs (keep password)
             document.getElementById('trade-symbol').value = '';
             document.getElementById('trade-entry').value = '';
             document.getElementById('trade-target').value = '';
             document.getElementById('trade-sl').value = '';
-            fetchLiveTrades();
+            fetchSignals();
+        } else {
+            alert(data.message || 'Unauthorized / Error broadcasting!');
         }
     } catch (e) {
-        alert('Failed to broadcast trade.');
+        alert('Failed to connect to server.');
     }
 }
 
-let lastFetchedCount = 0;
-async function fetchLiveTrades() {
+let lastCount = 0;
+async function fetchSignals() {
     try {
-        let res = await fetch('/api/trades');
-        let trades = await res.json();
+        let res = await fetch('/api/signals');
+        let signals = await res.json();
         let tbody = document.getElementById('signals-tbody');
         
-        if (trades.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #8b949e;">No active signals right now.</td></tr>`;
+        if (signals.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #94a3b8;">No active signals right now.</td></tr>`;
             return;
         }
 
-        // Trigger notification if a new trade arrives
-        if (trades.length > lastFetchedCount && lastFetchedCount !== 0) {
-            let latest = trades[0];
-            triggerPushNotification(`🚨 New Trade Signal: ${latest.symbol}`, `${latest.type} at $${latest.entry} (Target: $${latest.target})`);
+        // Trigger notification for users if a new signal arrives
+        if (signals.length > lastCount && lastCount !== 0) {
+            let latest = signals[0];
+            triggerNotification(`🚨 New Signal: ${latest.symbol}`, `${latest.type} | Entry: $${latest.entry} | Target: $${latest.target}`);
         }
-        lastFetchedCount = trades.length;
+        lastCount = signals.length;
 
         tbody.innerHTML = '';
-        trades.forEach(t => {
+        signals.forEach(s => {
             let tr = document.createElement('tr');
-            let typeClass = t.type === 'LONG' ? 'badge-long' : 'badge-short';
+            let typeClass = s.type === 'LONG' ? 'badge-long' : 'badge-short';
             tr.innerHTML = `
-                <td><strong>${t.symbol}</strong></td>
-                <td class="${typeClass}">${t.type}</td>
-                <td>$${t.entry}</td>
-                <td>$${t.target || 'N/A'}</td>
-                <td style="color: #8b949e; font-size: 11px;">${t.timestamp}</td>
+                <td><strong>${s.symbol}</strong></td>
+                <td><span class="${typeClass}">${s.type}</span></td>
+                <td>$${s.entry}</td>
+                <td>$${s.target || '-'}</td>
+                <td>$${s.stopLoss || '-'}</td>
+                <td style="color: #64748b; font-size: 12px;">${s.timestamp}</td>
             `;
             tbody.appendChild(tr);
         });
     } catch (e) {}
 }
 
-function triggerPushNotification(title, body) {
+function triggerNotification(title, body) {
     if (Notification.permission === 'granted') {
         new Notification(title, {
             body: body,
-            icon: 'https://cryptologos.cc/logos/bitcoin-btc-logo.png'
+            icon: 'https://cdn-icons-png.flaticon.com/512/1216/1216733.png'
         });
     }
 }
