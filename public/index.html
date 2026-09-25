@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CryptoSignals - Live Spot Signal Broadcast</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Google Fonts for High-End Financial Look -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -36,28 +35,28 @@
         <section class="feed-container">
             <h3>Active Broadcasted Signals</h3>
             <div id="signalsGrid" class="signals-grid">
-                <!-- Signals will load dynamically here with smooth animations -->
                 <div class="empty-state">Waiting for live broadcasted signals...</div>
             </div>
         </section>
     </main>
 
-    <!-- Admin Broadcast Modal Drawer -->
+    <!-- Admin Broadcast / Edit Modal Drawer -->
     <div id="adminModal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Admin Signal Broadcast</h3>
+                <h3 id="modalTitle">Admin Signal Broadcast</h3>
                 <button id="closeModalBtn" class="close-btn">&times;</button>
             </div>
 
             <div id="loginSection" class="auth-section">
-                <p>Enter Admin Password to Unlock Broadcasting</p>
+                <p>Enter Admin Password to Unlock Management</p>
                 <input type="password" id="adminPasswordInput" placeholder="Password (MalikKaBot)" autocomplete="current-password">
                 <button id="loginBtn" class="btn-primary">Unlock Panel</button>
             </div>
 
             <div id="broadcastSection" class="broadcast-form-section" style="display: none;">
                 <form id="broadcastForm">
+                    <input type="hidden" id="editingSignalId">
                     <div class="form-group">
                         <label>Trading Symbol</label>
                         <input type="text" id="symbolInput" placeholder="e.g. BTCUSDT" required>
@@ -98,12 +97,12 @@
                     </div>
 
                     <button type="submit" id="broadcastBtn" class="btn-primary pulse-btn">Broadcast Signal</button>
+                    <button type="button" id="cancelEditBtn" class="btn-secondary" style="display: none; margin-top: 8px;">Cancel Edit</button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Supabase JS Client CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
