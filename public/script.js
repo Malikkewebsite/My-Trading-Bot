@@ -18,6 +18,7 @@ const cancelEditBtn = document.getElementById('cancelEditBtn');
 const broadcastBtn = document.getElementById('broadcastBtn');
 
 let isAdminLoggedIn = false;
+const PUBLIC_VAPID_KEY = 'BNty3pSq2RF9kPlfzT2VW9YY11fHAVU2d1KFZdlvFqrVlulo8eH4Wr0e1RgbMwQvQQPYemkVAiZ0wDFNhA4B2J4';
 
 // Register Service Worker on Load for Background Push Capabilities
 if ('serviceWorker' in navigator) {
@@ -31,44 +32,56 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Request Push Notification Permission & Test Channel
+// Convert VAPID key string to Uint8Array
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+// Request Push Notification Permission & Save Offline Subscription to Supabase
 notifyBtn.addEventListener('click', async () => {
-    if (!("Notification" in window)) {
-        alert("This browser does not support desktop push notifications.");
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+        alert("Push notifications are not supported by your browser.");
         return;
     }
 
     try {
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
-            notifyBtn.textContent = "🔕 Alerts Active";
+            const registration = await navigator.serviceWorker.ready;
+            
+            // Subscribe to browser push server for offline capability
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
+            });
+
+            // Save subscription to Supabase table
+            const subJson = subscription.toJSON();
+            const { error } = await supabaseClient
+                .from('push_subscriptions')
+                .upsert([{ endpoint: subJson.endpoint, keys: subJson.keys }], { onConflict: 'endpoint' });
+
+            if (error) throw error;
+
+            notifyBtn.textContent = "🔕 Alerts Active (Offline Ready)";
             notifyBtn.style.background = "#10B981";
             notifyBtn.style.color = "#FFFFFF";
-
-            // Check if Service Worker is active and show a test notification
-            if ('serviceWorker' in navigator) {
-                const registration = await navigator.serviceWorker.ready;
-                if (registration) {
-                    await registration.showNotification("CryptoSignals Alert", {
-                        body: "Push notifications are successfully enabled for live spot signals!",
-                        icon: "https://cryptologos.cc/logos/tether-usdt-logo.png"
-                    });
-                    return;
-                }
-            }
-
-            // Fallback standard notification if service worker isn't registered yet
-            new Notification("CryptoSignals Alert", {
-                body: "Push notifications are successfully enabled!"
-            });
+            alert("Success! You will now receive background trade alerts even when the website is closed.");
         } else if (permission === "denied") {
-            alert("Notification permissions were blocked. Please reset site permissions in your browser address bar settings.");
+            alert("Notification permissions were blocked. Please reset permissions in your browser address bar settings.");
         } else {
             alert("Notification permission request was dismissed.");
         }
     } catch (err) {
-        console.error("Notification error:", err);
-        alert("Error enabling notifications: " + err.message);
+        console.error("Subscription error:", err);
+        alert("Error enabling push subscriptions: " + err.message);
     }
 });
 
@@ -90,14 +103,13 @@ loginBtn.addEventListener('click', () => {
         isAdminLoggedIn = true;
         loginSection.style.display = 'none';
         broadcastSection.style.display = 'flex';
-        fetchSignals(); // Refresh cards to show admin toolbar buttons
+        fetchSignals();
     } else {
         alert('Invalid Admin Password!');
         adminPasswordInput.value = '';
     }
 });
 
-// Reset Form to Create Mode
 function resetForm() {
     broadcastForm.reset();
     editingSignalId.value = '';
@@ -125,7 +137,6 @@ broadcastForm.addEventListener('submit', async (e) => {
 
     try {
         if (id) {
-            // Update Existing Trade
             const { error } = await supabaseClient
                 .from('signals')
                 .update({ symbol, trade_type, order_type, entry_price, target_price, stop_loss })
@@ -134,13 +145,12 @@ broadcastForm.addEventListener('submit', async (e) => {
             if (error) throw error;
             alert('Signal Updated Successfully!');
         } else {
-            // Insert New Trade
             const { error } = await supabaseClient
                 .from('signals')
                 .insert([{ symbol, trade_type, order_type, entry_price, target_price, stop_loss, status: 'ACTIVE' }]);
 
             if (error) throw error;
-            alert('Signal Broadcasted Successfully & Live Push Triggered!');
+            alert('Signal Broadcasted Successfully & Offline Push Triggered via Backend!');
         }
 
         resetForm();
@@ -155,7 +165,6 @@ broadcastForm.addEventListener('submit', async (e) => {
     }
 });
 
-// Fetch Signals
 async function fetchSignals() {
     const { data, error } = await supabaseClient
         .from('signals')
@@ -170,7 +179,6 @@ async function fetchSignals() {
     renderSignals(data);
 }
 
-// Render Signals with Admin Control Buttons
 function renderSignals(signals) {
     if (!signals || signals.length === 0) {
         signalsGrid.innerHTML = `<div class="empty-state">Waiting for live broadcasted signals...</div>`;
@@ -230,7 +238,6 @@ function renderSignals(signals) {
     });
 }
 
-// Global Admin Functions for Card Actions
 window.openEditModal = function(id, symbol, trade_type, order_type, entry_price, target_price, stop_loss) {
     adminModal.classList.add('active');
     loginSection.style.display = 'none';
@@ -276,29 +283,12 @@ window.deleteSignal = async function(id) {
     }
 };
 
-// Real-Time Supabase Listener
+// Real-Time Supabase Listener for Feed UI UI updates
 function setupRealtimeListener() {
     supabaseClient
         .channel('public:signals')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, payload => {
             console.log('Real-time change received:', payload);
-            if (payload.eventType === 'INSERT' && Notification.permission === "granted") {
-                const newSignal = payload.new;
-                
-                // Trigger via service worker registration if available, otherwise direct notification
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.ready.then(registration => {
-                        registration.showNotification(`🚨 New Spot Signal: ${newSignal.symbol} (${newSignal.trade_type})`, {
-                            body: `Order: ${newSignal.order_type}\nEntry: ${newSignal.entry_price}\nTarget: ${newSignal.target_price}`,
-                            icon: 'https://cryptologos.cc/logos/tether-usdt-logo.png'
-                        });
-                    });
-                } else {
-                    new Notification(`🚨 New Spot Signal: ${newSignal.symbol} (${newSignal.trade_type})`, {
-                        body: `Order: ${newSignal.order_type}\nEntry: ${newSignal.entry_price}\nTarget: ${newSignal.target_price}`,
-                    });
-                }
-            }
             fetchSignals();
         })
         .subscribe();
