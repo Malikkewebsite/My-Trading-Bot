@@ -13,8 +13,30 @@ const loginBtn = document.getElementById('loginBtn');
 const adminPasswordInput = document.getElementById('adminPasswordInput');
 const broadcastForm = document.getElementById('broadcastForm');
 const signalsGrid = document.getElementById('signalsGrid');
+const notifyBtn = document.getElementById('notifyBtn');
 
-// Modal Toggles
+// Request Browser Push Notification Permission on Click
+notifyBtn.addEventListener('click', async () => {
+    if (!("Notification" in window)) {
+        alert("This browser does not support desktop push notifications.");
+        return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+        notifyBtn.textContent = "🔕 Alerts Active";
+        notifyBtn.style.background = "#10B981";
+        notifyBtn.style.color = "#FFFFFF";
+        new Notification("CryptoSignals Alert", {
+            body: "Push notifications are successfully enabled for live spot signals!",
+            icon: "https://cryptologos.cc/logos/tether-usdt-logo.png"
+        });
+    } else {
+        alert("Notification permissions were denied.");
+    }
+});
+
+// Modal Toggles with smooth animation
 openAdminBtn.addEventListener('click', () => adminModal.classList.add('active'));
 closeModalBtn.addEventListener('click', () => adminModal.classList.remove('active'));
 adminModal.addEventListener('click', (e) => {
@@ -130,13 +152,22 @@ function renderSignals(signals) {
     });
 }
 
-// Real-Time Supabase Listener
+// Real-Time Supabase Listener + Native Push Notification Trigger
 function setupRealtimeListener() {
     supabaseClient
         .channel('public:signals')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'signals' }, payload => {
             console.log('New real-time signal received:', payload.new);
-            fetchSignals();
+            const newSignal = payload.new;
+
+            // Trigger browser push notification if user granted permission
+            if (Notification.permission === "granted") {
+                new Notification(`🚨 New Spot Signal: ${newSignal.symbol} (${newSignal.trade_type})`, {
+                    body: `Order: ${newSignal.order_type}\nEntry: ${newSignal.entry_price}\nTarget: ${newSignal.target_price}`,
+                });
+            }
+
+            fetchSignals(); // Refresh feed instantly with animations
         })
         .subscribe();
 }
