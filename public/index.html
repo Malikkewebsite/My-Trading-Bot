@@ -3,50 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Signals & Admin Broadcast</title>
+    <title>Malik Crypto Signals</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>🚀 Live Crypto Trading Signals</h1>
+        <header>
+            <h1>📈 Malik Crypto Signals</h1>
+            <p>Real-time professional trading signals & alerts</p>
+        </header>
         
-        <!-- Push Notification Permission Button -->
-        <div class="card">
-            <h3>🔔 Notifications</h3>
-            <button onclick="requestNotificationPermission()">Enable Push Notifications</button>
+        <!-- Push Notification Banner -->
+        <div class="card" style="text-align: center;">
+            <h3 style="border: none; margin-bottom: 5px;">🔔 Live Push Notifications</h3>
+            <p style="font-size: 13px; color: #64748b; margin-top: 0;">Get instant alerts on your device when a new signal drops.</p>
+            <button class="btn-notification" onclick="requestNotificationPermission()">Enable Notifications</button>
         </div>
 
-        <!-- Admin Panel for Executing Trades -->
+        <!-- Admin Broadcast Panel -->
         <div class="card" id="admin-panel">
-            <h3>🛠️ Admin Trade Execution Panel</h3>
-            <input type="text" id="trade-symbol" placeholder="Coin Symbol (e.g., BTCUSDT)">
+            <h3>🛠️ Admin Signal Broadcast Panel</h3>
+            
+            <label>Admin Password</label>
+            <input type="password" id="admin-pass" placeholder="Enter admin password">
+
+            <label>Coin Symbol</label>
+            <input type="text" id="trade-symbol" placeholder="e.g., BTCUSDT">
+
+            <label>Signal Type</label>
             <select id="trade-type">
                 <option value="LONG">LONG (Buy)</option>
                 <option value="SHORT">SHORT (Sell)</option>
             </select>
-            <input type="number" id="trade-entry" placeholder="Entry Price">
-            <input type="number" id="trade-target" placeholder="Target Price">
-            <input type="number" id="trade-sl" placeholder="Stop Loss">
-            <button onclick="executeAndBroadcastTrade()">Execute & Broadcast Trade</button>
+
+            <label>Entry Price</label>
+            <input type="number" id="trade-entry" placeholder="e.g., 65000">
+
+            <label>Target Price</label>
+            <input type="number" id="trade-target" placeholder="e.g., 68000">
+
+            <label>Stop Loss</label>
+            <input type="number" id="trade-sl" placeholder="e.g., 64000">
+
+            <button onclick="broadcastSignal()">Broadcast Signal to Users</button>
         </div>
 
-        <!-- Live Trades Feed for Users -->
+        <!-- Live Signals Table -->
         <div class="card">
-            <h3>📡 Live Signal Feed</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Pair</th>
-                        <th>Type</th>
-                        <th>Entry</th>
-                        <th>Target</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody id="signals-tbody">
-                    <tr><td colspan="5" style="text-align: center; color: #8b949e;">Loading live trades...</td></tr>
-                </tbody>
-            </table>
+            <h3>📡 Live Signal Stream</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pair</th>
+                            <th>Type</th>
+                            <th>Entry</th>
+                            <th>Target</th>
+                            <th>SL</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signals-tbody">
+                        <tr><td colspan="6" style="text-align: center; color: #94a3b8;">Connecting to live stream...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
