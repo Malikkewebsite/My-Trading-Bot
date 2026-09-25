@@ -19,20 +19,56 @@ const broadcastBtn = document.getElementById('broadcastBtn');
 
 let isAdminLoggedIn = false;
 
-// Request Push Notification Permission
+// Register Service Worker on Load for Background Push Capabilities
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        } catch (err) {
+            console.error('ServiceWorker registration failed: ', err);
+        }
+    });
+}
+
+// Request Push Notification Permission & Test Channel
 notifyBtn.addEventListener('click', async () => {
     if (!("Notification" in window)) {
         alert("This browser does not support desktop push notifications.");
         return;
     }
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") {
-        notifyBtn.textContent = "🔕 Alerts Active";
-        notifyBtn.style.background = "#10B981";
-        notifyBtn.style.color = "#FFFFFF";
-        new Notification("CryptoSignals Alert", { body: "Push notifications enabled for live spot signals!" });
-    } else {
-        alert("Notification permissions denied.");
+
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+            notifyBtn.textContent = "🔕 Alerts Active";
+            notifyBtn.style.background = "#10B981";
+            notifyBtn.style.color = "#FFFFFF";
+
+            // Check if Service Worker is active and show a test notification
+            if ('serviceWorker' in navigator) {
+                const registration = await navigator.serviceWorker.ready;
+                if (registration) {
+                    await registration.showNotification("CryptoSignals Alert", {
+                        body: "Push notifications are successfully enabled for live spot signals!",
+                        icon: "https://cryptologos.cc/logos/tether-usdt-logo.png"
+                    });
+                    return;
+                }
+            }
+
+            // Fallback standard notification if service worker isn't registered yet
+            new Notification("CryptoSignals Alert", {
+                body: "Push notifications are successfully enabled!"
+            });
+        } else if (permission === "denied") {
+            alert("Notification permissions were blocked. Please reset site permissions in your browser address bar settings.");
+        } else {
+            alert("Notification permission request was dismissed.");
+        }
+    } catch (err) {
+        console.error("Notification error:", err);
+        alert("Error enabling notifications: " + err.message);
     }
 });
 
@@ -54,7 +90,7 @@ loginBtn.addEventListener('click', () => {
         isAdminLoggedIn = true;
         loginSection.style.display = 'none';
         broadcastSection.style.display = 'flex';
-        fetchSignals(); // Refresh cards to show admin buttons
+        fetchSignals(); // Refresh cards to show admin toolbar buttons
     } else {
         alert('Invalid Admin Password!');
         adminPasswordInput.value = '';
@@ -248,9 +284,20 @@ function setupRealtimeListener() {
             console.log('Real-time change received:', payload);
             if (payload.eventType === 'INSERT' && Notification.permission === "granted") {
                 const newSignal = payload.new;
-                new Notification(`🚨 New Spot Signal: ${newSignal.symbol} (${newSignal.trade_type})`, {
-                    body: `Order: ${newSignal.order_type}\nEntry: ${newSignal.entry_price}\nTarget: ${newSignal.target_price}`,
-                });
+                
+                // Trigger via service worker registration if available, otherwise direct notification
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(registration => {
+                        registration.showNotification(`🚨 New Spot Signal: ${newSignal.symbol} (${newSignal.trade_type})`, {
+                            body: `Order: ${newSignal.order_type}\nEntry: ${newSignal.entry_price}\nTarget: ${newSignal.target_price}`,
+                            icon: 'https://cryptologos.cc/logos/tether-usdt-logo.png'
+                        });
+                    });
+                } else {
+                    new Notification(`🚨 New Spot Signal: ${newSignal.symbol} (${newSignal.trade_type})`, {
+                        body: `Order: ${newSignal.order_type}\nEntry: ${newSignal.entry_price}\nTarget: ${newSignal.target_price}`,
+                    });
+                }
             }
             fetchSignals();
         })
