@@ -67,7 +67,13 @@ notifyBtn.addEventListener('click', async () => {
         if (permission === "granted") {
             const registration = await navigator.serviceWorker.ready;
             
-            // Subscribe to browser push server for offline capability
+            // Clear any existing subscription with a different key to prevent conflicts
+            const existingSubscription = await registration.pushManager.getSubscription();
+            if (existingSubscription) {
+                await existingSubscription.unsubscribe();
+            }
+
+            // Subscribe to browser push server with the new VAPID key
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
@@ -84,7 +90,7 @@ notifyBtn.addEventListener('click', async () => {
             notifyBtn.textContent = "🔕 Alerts Active (Offline Ready)";
             notifyBtn.style.background = "#10B981";
             notifyBtn.style.color = "#FFFFFF";
-            alert("Success! You will now receive background trade alerts even when the website is closed.");
+            alert("Success! Notifications are now active with the new keys.");
         } else if (permission === "denied") {
             alert("Notification permissions were blocked. Please reset permissions in your browser address bar settings.");
         } else {
@@ -249,7 +255,7 @@ function renderSignals(signals) {
     });
 }
 
-window.openEditManager = function(id, symbol, trade_type, order_type, entry_price, target_price, stop_loss) {
+window.openEditModal = function(id, symbol, trade_type, order_type, entry_price, target_price, stop_loss) {
     adminModal.classList.add('active');
     loginSection.style.display = 'none';
     broadcastSection.style.display = 'flex';
