@@ -30,12 +30,16 @@ if ('serviceWorker' in navigator) {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
             await navigator.serviceWorker.ready;
             
-            // Check if user is already subscribed to push notifications
+            // Check if user is subscribed AND browser permission is actually granted
             const existingSubscription = await registration.pushManager.getSubscription();
-            if (existingSubscription) {
+            if (existingSubscription && Notification.permission === 'granted') {
                 notifyBtn.textContent = "🔕 Alerts Active (Offline Ready)";
                 notifyBtn.style.background = "#10B981";
                 notifyBtn.style.color = "#FFFFFF";
+            } else {
+                notifyBtn.textContent = "🔔 Enable Notifications";
+                notifyBtn.style.background = "";
+                notifyBtn.style.color = "";
             }
         } catch (err) {
             console.error('ServiceWorker registration failed: ', err);
