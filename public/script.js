@@ -18,7 +18,9 @@ const cancelEditBtn = document.getElementById('cancelEditBtn');
 const broadcastBtn = document.getElementById('broadcastBtn');
 
 let isAdminLoggedIn = false;
-const PUBLIC_VAPID_KEY = 'BNty3pSq2RF9kPlfzT2VW9YY11fHAVU2d1KFZdlvFqrVlulo8eH4Wr0e1RgbMwQvQQPYemkVAiZ0wDFNhA4B2J4';
+
+// Updated with the new VAPID Public Key matching Supabase secrets
+const PUBLIC_VAPID_KEY = 'BCYiKlYnc5XJkb9zbp3DTLsOLE8c6VjBMMon2XK8VGGESne1S8_cdzVAuWv7-FsPfYQcr4uw3uBB7Sp0CegRIBU';
 
 // Register Service Worker and check existing push subscription state on load
 if ('serviceWorker' in navigator) {
@@ -247,7 +249,7 @@ function renderSignals(signals) {
     });
 }
 
-window.openEditModal = function(id, symbol, trade_type, order_type, entry_price, target_price, stop_loss) {
+window.openEditManager = function(id, symbol, trade_type, order_type, entry_price, target_price, stop_loss) {
     adminModal.classList.add('active');
     loginSection.style.display = 'none';
     broadcastSection.style.display = 'flex';
