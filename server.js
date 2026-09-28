@@ -14,11 +14,20 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Secure Admin Login Endpoint
+app.post('/api/login', (req, res) => {
+    const { password } = req.body;
+    if (password === process.env.ADMIN_PASSWORD) {
+        return res.json({ success: true });
+    }
+    return res.status(401).json({ success: false, error: 'Invalid admin password!' });
+});
+
 // Admin Broadcast Endpoint
 app.post('/api/broadcast', async (req, res) => {
     const { password, symbol, trade_type, order_type, entry_price, target_price, stop_loss } = req.body;
 
-    // Verify Admin Password
+    // Verify Admin Password securely on backend
     if (password !== process.env.ADMIN_PASSWORD) {
         return res.status(401).json({ success: false, error: 'Invalid admin password!' });
     }
@@ -36,7 +45,8 @@ app.post('/api/broadcast', async (req, res) => {
             order_type,
             entry_price,
             target_price,
-            stop_loss
+            stop_loss,
+            status: 'ACTIVE'
         }])
         .select();
 
