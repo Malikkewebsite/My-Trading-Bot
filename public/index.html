@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CryptoSignals - Live Spot Signal Broadcast</title>
+    <title>AuraLumPurity Signals - Live Spot Signal Broadcast</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -13,7 +13,7 @@
     <header class="navbar">
         <div class="nav-brand">
             <span class="brand-icon">⚡</span>
-            <h1>CRYPTO<span class="highlight">SIGNALS</span></h1>
+            <h1>AURALUM<span class="highlight">PURITY</span></h1>
         </div>
         <div class="nav-actions">
             <button id="notifyBtn" class="btn-notify">🔔 Enable Alerts</button>
@@ -50,7 +50,7 @@
 
             <div id="loginSection" class="auth-section">
                 <p>Enter Admin Password to Unlock Management</p>
-                <input type="password" id="adminPasswordInput" placeholder="Password (MalikKaBot)" autocomplete="current-password">
+                <input type="password" id="adminPasswordInput" placeholder="Password" autocomplete="current-password">
                 <button id="loginBtn" class="btn-primary">Unlock Panel</button>
             </div>
 
@@ -82,17 +82,17 @@
 
                     <div class="form-group">
                         <label>Entry Price</label>
-                        <input type="text" id="entryInput" placeholder="e.g. 64200.00" required>
+                        <input type="number" step="any" id="entryInput" placeholder="e.g. 64200.00" required>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label>Target Price (TP)</label>
-                            <input type="text" id="targetInput" placeholder="e.g. 67500.00" required>
+                            <input type="number" step="any" id="targetInput" placeholder="e.g. 67500.00" required>
                         </div>
                         <div class="form-group">
                             <label>Stop Loss (SL)</label>
-                            <input type="text" id="stopLossInput" placeholder="e.g. 63000.00" required>
+                            <input type="number" step="any" id="stopLossInput" placeholder="e.g. 63000.00" required>
                         </div>
                     </div>
 
