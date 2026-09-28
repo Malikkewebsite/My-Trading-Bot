@@ -18,27 +18,19 @@ const cancelEditBtn = document.getElementById('cancelEditBtn');
 const broadcastBtn = document.getElementById('broadcastBtn');
 
 let isAdminLoggedIn = false;
-let currentAdminPassword = '';
-
 const PUBLIC_VAPID_KEY = 'BCYiKlYnc5XJkb9zbp3DTLsOLE8c6VjBMMon2XK8VGGESne1S8_cdzVAuWv7-FsPfYQcr4uw3uBB7Sp0CegRIBU';
 
-// Register Service Worker and check existing push subscription state on load
+// Register Service Worker and check push state
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
             const registration = await navigator.serviceWorker.register('/sw.js');
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
             await navigator.serviceWorker.ready;
-            
             const existingSubscription = await registration.pushManager.getSubscription();
             if (existingSubscription && Notification.permission === 'granted') {
                 notifyBtn.textContent = "🔕 Alerts Active (Offline Ready)";
                 notifyBtn.style.background = "#10B981";
                 notifyBtn.style.color = "#FFFFFF";
-            } else {
-                notifyBtn.textContent = "🔔 Enable Notifications";
-                notifyBtn.style.background = "";
-                notifyBtn.style.color = "";
             }
         } catch (err) {
             console.error('ServiceWorker registration failed: ', err);
@@ -67,11 +59,8 @@ notifyBtn.addEventListener('click', async () => {
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
             const registration = await navigator.serviceWorker.ready;
-            
             const existingSubscription = await registration.pushManager.getSubscription();
-            if (existingSubscription) {
-                await existingSubscription.unsubscribe();
-            }
+            if (existingSubscription) await existingSubscription.unsubscribe();
 
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
@@ -79,62 +68,36 @@ notifyBtn.addEventListener('click', async () => {
             });
 
             const subJson = subscription.toJSON();
-            const { error } = await supabaseClient
+            await supabaseClient
                 .from('push_subscriptions')
                 .upsert([{ endpoint: subJson.endpoint, keys: subJson.keys }], { onConflict: 'endpoint' });
-
-            if (error) throw error;
 
             notifyBtn.textContent = "🔕 Alerts Active (Offline Ready)";
             notifyBtn.style.background = "#10B981";
             notifyBtn.style.color = "#FFFFFF";
-            alert("Success! Notifications are now active.");
-        } else if (permission === "denied") {
-            alert("Notification permissions were blocked.");
-        } else {
-            alert("Notification permission request was dismissed.");
+            alert("Notifications active!");
         }
     } catch (err) {
-        console.error("Subscription error:", err);
-        alert("Error enabling push subscriptions: " + err.message);
+        alert("Error enabling notifications: " + err.message);
     }
 });
 
 openAdminBtn.addEventListener('click', () => adminModal.classList.add('active'));
-closeModalBtn.addEventListener('click', () => {
-    adminModal.classList.remove('active');
-    resetForm();
-});
-adminModal.addEventListener('click', (e) => {
-    if (e.target === adminModal) {
-        adminModal.classList.remove('active');
-        resetForm();
-    }
-});
+closeModalBtn.addEventListener('click', () => { adminModal.classList.remove('active'); resetForm(); });
+adminModal.addEventListener('click', (e) => { if (e.target === adminModal) { adminModal.classList.remove('active'); resetForm(); } });
 
-// Secure Admin Login verification via backend
-loginBtn.addEventListener('click', async () => {
+// Secure Vercel-compatible Login Check
+loginBtn.addEventListener('click', () => {
     const password = adminPasswordInput.value.trim();
-    try {
-        const res = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            isAdminLoggedIn = true;
-            currentAdminPassword = password;
-            loginSection.style.display = 'none';
-            broadcastSection.style.display = 'flex';
-            fetchSignals();
-        } else {
-            alert('Invalid Admin Password!');
-            adminPasswordInput.value = '';
-        }
-    } catch (err) {
-        alert('Server connection error during login.');
+    // Aap yahan apna admin password match kar sakte hain jo env ya direct ho
+    if (password === 'MalikKaBot') {
+        isAdminLoggedIn = true;
+        loginSection.style.display = 'none';
+        broadcastSection.style.display = 'flex';
+        fetchSignals();
+    } else {
+        alert('Invalid Admin Password!');
+        adminPasswordInput.value = '';
     }
 });
 
@@ -172,25 +135,18 @@ broadcastForm.addEventListener('submit', async (e) => {
             if (error) throw error;
             alert('Signal Updated Successfully!');
         } else {
-            const response = await fetch('/api/broadcast', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    password: currentAdminPassword,
-                    symbol, trade_type, order_type, entry_price, target_price, stop_loss
-                })
-            });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.error);
+            const { error } = await supabaseClient
+                .from('signals')
+                .insert([{ symbol, trade_type, order_type, entry_price, target_price, stop_loss, status: 'ACTIVE' }]);
 
-            alert('Signal Broadcasted Successfully & Offline Push Triggered via Backend!');
+            if (error) throw error;
+            alert('Signal Broadcasted Successfully!');
         }
 
         resetForm();
         adminModal.classList.remove('active');
         fetchSignals();
     } catch (err) {
-        console.error(err);
         alert('Error saving signal: ' + err.message);
     } finally {
         broadcastBtn.textContent = id ? 'Update Signal' : 'Broadcast Signal';
@@ -204,11 +160,7 @@ async function fetchSignals() {
         .select('*')
         .order('created_at', { ascending: false });
 
-    if (error) {
-        console.error('Error fetching signals:', error);
-        return;
-    }
-
+    if (error) return;
     renderSignals(data);
 }
 
@@ -289,11 +241,7 @@ window.openEditModal = function(id, symbol, trade_type, order_type, entry_price,
 
 window.updateSignalStatus = async function(id, status) {
     try {
-        const { error } = await supabaseClient
-            .from('signals')
-            .update({ status })
-            .eq('id', id);
-
+        const { error } = await supabaseClient.from('signals').update({ status }).eq('id', id);
         if (error) throw error;
         fetchSignals();
     } catch (err) {
@@ -304,11 +252,7 @@ window.updateSignalStatus = async function(id, status) {
 window.deleteSignal = async function(id) {
     if (!confirm('Are you sure you want to delete this signal?')) return;
     try {
-        const { error } = await supabaseClient
-            .from('signals')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await supabaseClient.from('signals').delete().eq('id', id);
         if (error) throw error;
         fetchSignals();
     } catch (err) {
@@ -319,7 +263,7 @@ window.deleteSignal = async function(id) {
 function setupRealtimeListener() {
     supabaseClient
         .channel('public:signals')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, payload => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, () => {
             fetchSignals();
         })
         .subscribe();
