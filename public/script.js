@@ -18,8 +18,8 @@ const cancelEditBtn = document.getElementById('cancelEditBtn');
 const broadcastBtn = document.getElementById('broadcastBtn');
 
 let isAdminLoggedIn = false;
+let currentAdminPassword = '';
 
-// Updated with the new VAPID Public Key matching Supabase secrets
 const PUBLIC_VAPID_KEY = 'BCYiKlYnc5XJkb9zbp3DTLsOLE8c6VjBMMon2XK8VGGESne1S8_cdzVAuWv7-FsPfYQcr4uw3uBB7Sp0CegRIBU';
 
 // Register Service Worker and check existing push subscription state on load
@@ -30,7 +30,6 @@ if ('serviceWorker' in navigator) {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
             await navigator.serviceWorker.ready;
             
-            // Check if user is subscribed AND browser permission is actually granted
             const existingSubscription = await registration.pushManager.getSubscription();
             if (existingSubscription && Notification.permission === 'granted') {
                 notifyBtn.textContent = "🔕 Alerts Active (Offline Ready)";
@@ -47,7 +46,6 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Convert VAPID key string to Uint8Array
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -59,7 +57,6 @@ function urlBase64ToUint8Array(base64String) {
     return outputArray;
 }
 
-// Request Push Notification Permission & Save Offline Subscription to Supabase
 notifyBtn.addEventListener('click', async () => {
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
         alert("Push notifications are not supported by your browser.");
@@ -71,19 +68,16 @@ notifyBtn.addEventListener('click', async () => {
         if (permission === "granted") {
             const registration = await navigator.serviceWorker.ready;
             
-            // Clear any existing subscription with a different key to prevent conflicts
             const existingSubscription = await registration.pushManager.getSubscription();
             if (existingSubscription) {
                 await existingSubscription.unsubscribe();
             }
 
-            // Subscribe to browser push server with the new VAPID key
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
             });
 
-            // Save subscription to Supabase table
             const subJson = subscription.toJSON();
             const { error } = await supabaseClient
                 .from('push_subscriptions')
@@ -94,9 +88,9 @@ notifyBtn.addEventListener('click', async () => {
             notifyBtn.textContent = "🔕 Alerts Active (Offline Ready)";
             notifyBtn.style.background = "#10B981";
             notifyBtn.style.color = "#FFFFFF";
-            alert("Success! Notifications are now active with the new keys.");
+            alert("Success! Notifications are now active.");
         } else if (permission === "denied") {
-            alert("Notification permissions were blocked. Please reset permissions in your browser address bar settings.");
+            alert("Notification permissions were blocked.");
         } else {
             alert("Notification permission request was dismissed.");
         }
@@ -118,16 +112,29 @@ adminModal.addEventListener('click', (e) => {
     }
 });
 
-loginBtn.addEventListener('click', () => {
+// Secure Admin Login verification via backend
+loginBtn.addEventListener('click', async () => {
     const password = adminPasswordInput.value.trim();
-    if (password === 'MalikKaBot') {
-        isAdminLoggedIn = true;
-        loginSection.style.display = 'none';
-        broadcastSection.style.display = 'flex';
-        fetchSignals();
-    } else {
-        alert('Invalid Admin Password!');
-        adminPasswordInput.value = '';
+    try {
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            isAdminLoggedIn = true;
+            currentAdminPassword = password;
+            loginSection.style.display = 'none';
+            broadcastSection.style.display = 'flex';
+            fetchSignals();
+        } else {
+            alert('Invalid Admin Password!');
+            adminPasswordInput.value = '';
+        }
+    } catch (err) {
+        alert('Server connection error during login.');
     }
 });
 
@@ -141,7 +148,6 @@ function resetForm() {
 
 cancelEditBtn.addEventListener('click', resetForm);
 
-// Handle Insert or Update Form Submission
 broadcastForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -166,11 +172,17 @@ broadcastForm.addEventListener('submit', async (e) => {
             if (error) throw error;
             alert('Signal Updated Successfully!');
         } else {
-            const { error } = await supabaseClient
-                .from('signals')
-                .insert([{ symbol, trade_type, order_type, entry_price, target_price, stop_loss, status: 'ACTIVE' }]);
+            const response = await fetch('/api/broadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    password: currentAdminPassword,
+                    symbol, trade_type, order_type, entry_price, target_price, stop_loss
+                })
+            });
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error);
 
-            if (error) throw error;
             alert('Signal Broadcasted Successfully & Offline Push Triggered via Backend!');
         }
 
@@ -304,12 +316,10 @@ window.deleteSignal = async function(id) {
     }
 };
 
-// Real-Time Supabase Listener for Feed UI updates
 function setupRealtimeListener() {
     supabaseClient
         .channel('public:signals')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, payload => {
-            console.log('Real-time change received:', payload);
             fetchSignals();
         })
         .subscribe();
